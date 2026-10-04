@@ -9,6 +9,7 @@ Exceptions (composants de tiers, sous leur propre licence) :
 - web/wheels/fpdf2-2.8.9-py3-none-any.whl : fpdf2, licence LGPL-3.0 (bibliothèque non modifiée,
   fournie telle quelle ; sources : https://github.com/py-pdf/fpdf2).
 - web/wheels/defusedxml-0.7.1-py2.py3-none-any.whl : defusedxml, licence PSF.
+- web/wheels/pypdf-6.19.0-py3-none-any.whl : pypdf, licence BSD-3-Clause.
 - polices/EBGaramond-*.ttf : EB Garamond (Georg Duffner, Octavio Pardo), SIL Open Font License 1.1,
   voir polices/OFL-EBGaramond.txt (fichiers réduits aux caractères latins).
 - Bibliothèques chargées depuis un CDN (Pyodide, SDK Anthropic) : sous leur propre licence.
