@@ -466,9 +466,9 @@ async function partager(f) {
     return;
   }
   telecharger(f);
-  alert("Ce navigateur ne permet pas de partager directement ce type de fichier. Il vient d'être "
-    + "téléchargé : ouvrez « Téléchargements » (ou Fichiers) et partagez-le de là, ou joignez-le "
-    + "depuis WhatsApp / votre messagerie.");
+  alert("Ce navigateur ne permet pas de partager directement un fichier Word (le PDF, lui, se "
+    + "partage). Le fichier vient d'être téléchargé : partagez-le depuis « Téléchargements » "
+    + "ou joignez-le depuis WhatsApp / votre messagerie.");
 }
 
 function afficherResultats(fichiers, cible, referenceProposee = false) {

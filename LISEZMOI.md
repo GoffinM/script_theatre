@@ -20,7 +20,7 @@ C'est une page statique, publiable telle quelle sur GitHub Pages. Le code Python
 - **Mode « en arrière-plan »** (Réglages > Exécution) : la transcription est confiée à l'API Batch d'Anthropic. Elle est traitée même application fermée (en général en quelques minutes) et coûte 2 fois moins cher. À la réouverture, l'application termine le document. Anthropic refuse l'API Batch depuis un navigateur, d'où le petit relais gratuit à déployer sur Cloudflare (`outils/relais-cloudflare.js`, mode d'emploi en tête du fichier). Ce relais ne conserve aucune clé.
 - **Partage :** Chrome sur Android refuse de partager les fichiers Word. « Partager » télécharge alors le fichier, et on l'envoie depuis Téléchargements ou depuis WhatsApp. Le rapport, lui, se partage en texte.
 - **Profil :** « Réglages > Modifier le profil » permet par exemple d'adapter la liste des personnages. Le profil modifié est enregistré sur l'appareil.
-- **Pas de PDF** dans le navigateur : ouvrir le DOCX dans Word, Pages ou Google Docs pour l'exporter.
+- **PDF :** chaque résultat comprend un PDF, qui se lit et se partage partout, y compris avec le partage de Chrome sur Android, qui refuse les fichiers Word. Pour une mise à jour, le PDF montre les modifications en couleur, une couleur par personne : ajouts soulignés, suppressions barrées, notes et conflits sous les répliques concernées.
 
 Pour tester l'application sur ce PC, avec la clé du fichier `.env` qui ne passe jamais par le navigateur :
 ```
@@ -37,12 +37,12 @@ puis ouvrir http://localhost:8765. Dans « Réglages », mettre la clé `dev`, e
 Ouvrir un terminal dans ce dossier (`OCR_theatre`), puis :
 
 ```
-.venv\Scripts\python -m remise_en_forme tout exemple\test1 --nom ma_piece --pdf
+.venv\Scripts\python -m remise_en_forme tout exemple\test1 --nom ma_piece
 ```
 
 - `exemple\test1` : le dossier contenant les photos (JPG/PNG), **dans l'ordre des pages** (l'ordre alphabétique des noms de fichiers).
 - `--nom ma_piece` : nom du fichier produit.
-- `--pdf` : produit aussi un PDF (via Word).
+- Un PDF est toujours produit, sans Word, par l'outil lui-même (police EB Garamond embarquée).
 
 Résultat : `sortie\05_rendu\ma_piece.docx`. Lire aussi `sortie\04_controles\rapport.md`, qui liste ce qu'il faut vérifier.
 
@@ -58,7 +58,7 @@ Chaque étape relit la sortie de la précédente. On peut les lancer une par une
 | `transcrire` | transcription littérale, une page par appel à Claude | `sortie\02_transcription\` (un `.txt` par page) |
 | `structurer` | étiquetage (réplique, didascalie…) selon le profil | `sortie\03_structuration\` |
 | `controler` | contrôles et assemblage, sans appel à l'API | `sortie\04_controles\rapport.md` |
-| `rendre` | DOCX (+ PDF avec `--pdf`) | `sortie\05_rendu\` |
+| `rendre` | DOCX, DOCX à annoter et PDF | `sortie\05_rendu\` |
 
 Options utiles :
 - `--rotation "photo.jpeg=90"` : force la rotation d'une photo mal orientée (0/90/180/270, sens horaire).
@@ -83,7 +83,7 @@ Les annotations peuvent porter sur le livre d'origine ou sur la copie imprimée 
 .venv\Scripts\python -m remise_en_forme mettre-a-jour sortie\05_rendu\ma_piece.docx annotations\semaine_42 -o maj_42
 ```
 
-Résultat : `maj_42\ma_piece_maj.docx` et `maj_42\rapport_maj.md`.
+Résultat : `maj_42\ma_piece_maj.docx` (à valider dans Word), `maj_42\ma_piece_maj.pdf` (modifications en couleur, pour lire et partager) et `maj_42\rapport_maj.md`.
 - Les textes barrés, remplacés ou ajoutés et les coupes (crochets) apparaissent en **suivi des modifications** Word, au nom de chaque personne (le nom du sous-dossier).
 - Les **notes de jeu** deviennent des commentaires Word au nom de leur auteur.
 - Si deux personnes proposent des choses différentes pour un même passage, **rien n'est appliqué** : un commentaire « Conflit » liste les propositions.
@@ -106,7 +106,7 @@ Coût mesuré pour une transcription complète : environ 3 centimes par page (Op
 
 Les profils sont dans `profils\` :
 - `theatre` (par défaut) : titre, liste des personnages, répliques, didascalies ;
-- `roman` : chapitres, épigraphes, paragraphes, dialogues, notes de bas de page. Exemple : `... tout exemple\test2 -o sortie_test2 -p roman --nom chapitre_II --pdf`
+- `roman` : chapitres, épigraphes, paragraphes, dialogues, notes de bas de page. Exemple : `... tout exemple\test2 -o sortie_test2 -p roman --nom chapitre_II`
 
 Les pages blanches (seul le verso transparaît) sont détectées et ignorées. Un numéro de page illisible est déduit des pages voisines, et le rapport le signale.
  Pour une autre pièce de théâtre, copier `theatre.yaml` et changer la liste `personnages`. Le profil décide aussi :

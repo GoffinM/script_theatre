@@ -5,7 +5,7 @@
   transcrire  pages -> texte littéral, API Claude   (02_transcription)
   structurer  texte -> éléments JSON selon profil   (03_structuration)
   controler   contrôles + assemblage, sans API      (04_controles)
-  rendre      DOCX (+ PDF)                          (05_rendu)
+  rendre      DOCX, DOCX à annoter et PDF           (05_rendu)
   tout        les cinq à la suite
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> None:
 
     def rendu(p):
         p.add_argument("--nom", default="document", help="nom du fichier produit")
-        p.add_argument("--pdf", action="store_true", help="produit aussi un PDF (LibreOffice ou Word)")
+        p.add_argument("--pdf", action="store_true", help=argparse.SUPPRESS)  # ancien : le PDF est toujours produit
 
     p = sub.add_parser("pretraiter", help="Étape 1 : orientation, doubles pages, redressement, contraste")
     entree(p); commun(p)
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> None:
     if a.etape in ("rendre", "tout"):
         from . import rendu as r
         print("— Étape 5 : rendu")
-        r.executer(a.sortie, prof, a.nom, a.pdf)
+        r.executer(a.sortie, prof, a.nom)
     if a.etape == "mettre-a-jour":
         from . import mise_a_jour
         sortie = a.sortie if a.sortie != Path("sortie") else Path("sortie_maj")

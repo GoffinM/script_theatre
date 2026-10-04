@@ -17,7 +17,8 @@ Puis fusion de toutes les personnes :
   - même modification proposée par plusieurs → une seule, auteurs réunis ;
   - désaccord sur un même passage → rien d'appliqué, commentaire « Conflit » ;
   - notes de jeu → commentaires Word au nom de l'auteur.
-Sorties : <sortie>/<nom>.docx (à valider dans Word) et <sortie>/rapport_maj.md
+Sorties : <sortie>/<nom>.docx (à valider dans Word), <sortie>/<nom>.pdf (lecture,
+          modifications en couleur) et <sortie>/rapport_maj.md
 """
 from __future__ import annotations
 
@@ -359,6 +360,8 @@ def finaliser(nom_reference: str, elements: list[dict], lectures: dict[str, tupl
     resultat = fusionner(elements, toutes, rap)
     cible = sortie / f"{nom}.docx"
     rendu.construire(resultat, prof).save(str(cible))
+    from . import pdf
+    cible.with_suffix(".pdf").write_bytes(pdf.construire(resultat, prof, nom))
 
     md = [f"# Mise à jour de {nom_reference}", "",
           f"Personnes : {', '.join(lectures)} — {len(toutes)} opération(s) lue(s).", "",

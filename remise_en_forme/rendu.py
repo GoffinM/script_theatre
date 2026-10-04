@@ -1,7 +1,7 @@
 """Étape 5 — Rendu DOCX (et PDF en option) selon la mise en page du profil.
 
 Entrée  : <sortie>/04_controles/document.json
-Sortie  : <sortie>/05_rendu/<nom>.docx (+ .pdf avec --pdf)
+Sortie  : <sortie>/05_rendu/<nom>.docx, <nom>_a_annoter.docx et <nom>.pdf (voir pdf.py)
 
 Les styles sont créés d'après `mise_en_page.styles` du profil. Si le profil
 désigne un `docx_reference`, le document part de ce fichier : ses styles de
@@ -20,8 +20,6 @@ from __future__ import annotations
 import itertools
 import json
 import re
-import shutil
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -214,23 +212,7 @@ def construire(elements: list[dict], prof: dict, numeros: bool = False) -> Docum
     return doc
 
 
-def vers_pdf(docx: Path) -> Path:
-    pdf = docx.with_suffix(".pdf")
-    soffice = shutil.which("soffice") or next(
-        (p for p in [r"C:\Program Files\LibreOffice\program\soffice.exe"] if Path(p).exists()), None)
-    if soffice:
-        subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", str(docx.parent), str(docx)],
-                       check=True, capture_output=True)
-        return pdf
-    # Microsoft Word (Windows) par automatisation COM
-    script = (f"$w = New-Object -ComObject Word.Application; $w.Visible = $false; "
-              f"$d = $w.Documents.Open('{docx.resolve()}'); $d.SaveAs([ref]'{pdf.resolve()}', [ref]17); "
-              f"$d.Close(); $w.Quit()")
-    subprocess.run(["powershell", "-NoProfile", "-Command", script], check=True, capture_output=True)
-    return pdf
-
-
-def executer(sortie: Path, prof: dict, nom: str = "document", pdf: bool = False) -> Path:
+def executer(sortie: Path, prof: dict, nom: str = "document") -> Path:
     sys.stdout.reconfigure(encoding="utf-8")
     elements = json.loads((sortie / "04_controles" / "document.json").read_text(encoding="utf-8"))
     dossier = sortie / "05_rendu"
@@ -242,6 +224,9 @@ def executer(sortie: Path, prof: dict, nom: str = "document", pdf: bool = False)
     annoter = dossier / f"{nom}_a_annoter.docx"
     construire(elements, prof, numeros=True).save(str(annoter))
     print(f"DOCX à imprimer pour les annotations : {annoter}")
-    if pdf:
-        print(f"PDF  : {vers_pdf(cible)}")
+    # PDF pour lire et partager (le partage de Chrome sur Android refuse les .docx)
+    from . import pdf
+    cible_pdf = dossier / f"{nom}.pdf"
+    cible_pdf.write_bytes(pdf.construire(elements, prof, nom))
+    print(f"PDF  : {cible_pdf}")
     return cible

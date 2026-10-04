@@ -22,10 +22,15 @@ const SDK = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
 const RACINE = new URL("../", import.meta.url);
 const SOURCES = [
   "remise_en_forme/__init__.py", "remise_en_forme/claude.py", "remise_en_forme/controles.py",
-  "remise_en_forme/mise_a_jour.py", "remise_en_forme/pretraitement.py", "remise_en_forme/profil.py",
+  "remise_en_forme/mise_a_jour.py", "remise_en_forme/pdf.py", "remise_en_forme/pretraitement.py",
+  "remise_en_forme/profil.py",
   "remise_en_forme/reference.py", "remise_en_forme/rendu.py", "remise_en_forme/structuration.py",
   "remise_en_forme/transcription.py", "remise_en_forme/web.py",
 ];
+// Bibliothèques Python fournies avec le site (pur Python)
+const ROUES = ["defusedxml-0.7.1-py2.py3-none-any.whl", "python_docx-1.2.0-py3-none-any.whl",
+               "fpdf2-2.8.9-py3-none-any.whl"];
+const POLICES = ["EBGaramond-Regular.ttf", "EBGaramond-Bold.ttf", "EBGaramond-Italic.ttf", "EBGaramond-BoldItalic.ttf"];
 const PARALLELES = 4;
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -38,24 +43,46 @@ const log = (texte) => envoyer({ type: "log", texte });
 
 class EnAttente extends Error {}
 
+// Téléchargement d'un fichier du site, avec nouvelles tentatives (réseau mobile instable).
+// Le contenu est lu DANS la boucle : une coupure en plein transfert est aussi retentée.
+async function charger(chemin, format = "octets", essais = 4) {
+  for (let i = 1; ; i++) {
+    try {
+      const rep = await fetch(new URL(chemin, RACINE));
+      if (rep.status === 404) throw Object.assign(new Error(`Fichier introuvable sur le site : ${chemin}`), { definitif: true });
+      if (rep.ok) return format === "texte" ? await rep.text() : await rep.arrayBuffer();
+      throw new Error(`HTTP ${rep.status}`);
+    } catch (e) {
+      if (e.definitif) throw e;
+      if (i >= essais) throw new Error(`Téléchargement impossible (${chemin}) : ${e.message}`);
+    }
+    await new Promise((r) => setTimeout(r, 800 * i));
+  }
+}
+
 async function init() {
   envoyer({ type: "etape", texte: "Chargement de Python (premier lancement : ~40 Mo)…", fait: 0, total: 4 });
   const { loadPyodide } = await import(PYODIDE + "pyodide.mjs");
   py = await loadPyodide({ indexURL: PYODIDE, stdout: log, stderr: log });
   envoyer({ type: "etape", texte: "Chargement d'OpenCV et des bibliothèques…", fait: 1, total: 4 });
-  await py.loadPackage(["numpy", "opencv-python", "pyyaml", "lxml", "typing-extensions"]);
-  // python-docx (fourni avec le site) : décompressé directement, sans installateur —
+  await py.loadPackage(["numpy", "opencv-python", "pyyaml", "lxml", "typing-extensions", "pillow", "fonttools"]);
+  // python-docx, fpdf2… (fournis avec le site) : décompressés directement, sans installateur —
   // micropip interroge PyPI, ce qui échoue sur les réseaux filtrés.
-  const roue = await fetch(new URL("web/wheels/python_docx-1.2.0-py3-none-any.whl", RACINE));
-  if (!roue.ok) throw new Error("Bibliothèque Word introuvable sur le site.");
-  py.unpackArchive(await roue.arrayBuffer(), "wheel");
+  // décompressées comme de simples zip dans site-packages : le format « wheel » de Pyodide
+  // vérifie les dépendances et va chercher sur PyPI celles qu'il ne connaît pas.
+  const sitePackages = py.runPython("import site; site.getsitepackages()[0]");
+  for (const nom of ROUES) {
+    py.unpackArchive(await charger(`web/wheels/${nom}`), "zip", { extractDir: sitePackages });
+  }
   envoyer({ type: "etape", texte: "Chargement de l'outil…", fait: 2, total: 4 });
   py.FS.mkdirTree("/app/remise_en_forme");
+  py.FS.mkdirTree("/app/polices");
+  for (const nom of POLICES) {
+    py.FS.writeFile(`/app/polices/${nom}`, new Uint8Array(await charger(`polices/${nom}`)));
+  }
   const version = Date.now(); // évite un code périmé en cache après une mise à jour du site
   for (const f of SOURCES) {
-    const rep = await fetch(new URL(f + "?v=" + version, RACINE));
-    if (!rep.ok) throw new Error(`Fichier introuvable : ${f}`);
-    py.FS.writeFile("/app/" + f, await rep.text());
+    py.FS.writeFile("/app/" + f, await charger(f + "?v=" + version, "texte"));
   }
   py.runPython("import sys; sys.path.insert(0, '/app')");
   web = py.pyimport("remise_en_forme.web");
@@ -205,8 +232,8 @@ async function nouveau(t) {
 
   envoyer({ type: "etape", texte: "Contrôles et document Word…", fait: 0, total: 1 });
   const f = JSON.parse(web.controler_et_rendre(S, nom));
-  return [lire(f.docx, `${nom}.docx`, DOCX), lire(f.a_annoter, `${nom}_a_annoter.docx`, DOCX),
-          lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
+  return [lire(f.pdf, `${nom}.pdf`, "application/pdf"), lire(f.docx, `${nom}.docx`, DOCX),
+          lire(f.a_annoter, `${nom}_a_annoter.docx`, DOCX), lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
 }
 
 async function maj(t) {
@@ -241,7 +268,8 @@ async function maj(t) {
   }
   envoyer({ type: "etape", texte: "Fusion et document Word…", fait: 0, total: 1 });
   const f = JSON.parse(web.maj_finaliser("/travail/resultat", nom));
-  return [lire(f.docx, `${nom}.docx`, DOCX), lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
+  return [lire(f.pdf, `${nom}.pdf`, "application/pdf"), lire(f.docx, `${nom}.docx`, DOCX),
+          lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
 }
 
 async function lancer({ id, cle, adresseApi, relais }) {
@@ -269,6 +297,7 @@ self.onmessage = async ({ data }) => {
     if (data.type === "init") await init();
     else if (data.type === "lancer") await lancer(data);
   } catch (e) {
+    log(`[détail de l'erreur] ${e?.stack || e}`); // visible dans « Détails »
     let texte = String(e?.message || e);
     // erreur Python : garder la dernière ligne (le message utile)
     if (texte.includes("Traceback")) texte = texte.trim().split("\n").pop();

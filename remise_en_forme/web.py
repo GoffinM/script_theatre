@@ -98,6 +98,7 @@ def controler_et_rendre(sortie: str, nom: str) -> str:
     controles.executer(s, _PROFIL)
     rendu.executer(s, _PROFIL, nom)
     return json.dumps({"docx": str(s / "05_rendu" / f"{nom}.docx"),
+                       "pdf": str(s / "05_rendu" / f"{nom}.pdf"),
                        "a_annoter": str(s / "05_rendu" / f"{nom}_a_annoter.docx"),
                        "rapport": str(s / "04_controles" / "rapport.md")})
 
@@ -140,4 +141,5 @@ def maj_terminer_auteur(auteur: str, travail: str, reponses_json: str) -> str:
 def maj_finaliser(sortie: str, nom: str) -> str:
     cible = mise_a_jour.finaliser(_MAJ["nom_reference"], _MAJ["elements"], _MAJ["lectures"],
                                   _PROFIL, Path(sortie), nom)
-    return json.dumps({"docx": str(cible), "rapport": str(Path(sortie) / "rapport_maj.md")})
+    return json.dumps({"docx": str(cible), "pdf": str(cible.with_suffix(".pdf")),
+                       "rapport": str(Path(sortie) / "rapport_maj.md")})
