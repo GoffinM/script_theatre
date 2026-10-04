@@ -58,10 +58,16 @@
                       justify-content: space-between; align-items: center; }
   details > summary::after { content: "▾"; color: var(--doux); }
   details[open] > summary::after { content: "▴"; }
-  .vignettes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .selecteur .rangee { margin-top: 8px; }
+  .selecteur input[type=file] { display: none; }
+  .selecteur .compte { color: var(--doux); font-size: .85rem; }
+  .vignettes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
   .vignettes figure { margin: 0; position: relative; }
-  .vignettes img { width: 64px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid var(--ligne); }
-  .vignettes figcaption { position: absolute; top: 2px; left: 4px; font-size: .7rem; font-weight: 700;
+  .vignettes img { width: 72px; height: 96px; object-fit: cover; border-radius: 6px; border: 1px solid var(--ligne); display: block; }
+  .vignettes .outils { display: flex; justify-content: space-between; margin-top: 2px; }
+  .vignettes .outils button { min-height: 30px; padding: 2px 8px; font-size: .8rem; background: var(--accent-doux);
+                              color: var(--accent); border-radius: 6px; }
+  .vignettes figcaption { position: absolute; top: 2px; left: 4px; font-size: .75rem; font-weight: 700;
                           color: #fff; text-shadow: 0 0 3px #000; }
   .personne { border: 1px dashed var(--ligne); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
   .personne .rangee { margin-top: 6px; }
@@ -125,10 +131,10 @@
 
   <section class="carte" id="onglet-nouveau">
     <h2>Transcrire des pages</h2>
-    <label for="photos">Photos des pages, dans l'ordre</label>
-    <input id="photos" type="file" accept="image/*" multiple>
-    <p class="aide">Une ou deux pages par photo, dans n'importe quel sens. L'ordre est celui de la sélection.</p>
-    <div class="vignettes" id="vignettes"></div>
+    <label>Photos des pages, dans l'ordre</label>
+    <div id="photos"></div>
+    <p class="aide">Une ou deux pages par photo, dans n'importe quel sens, bien à plat et sans reflet.
+      ◀ déplace une photo d'un cran vers le début, ✕ la retire.</p>
     <label for="nom">Nom du document</label>
     <input id="nom" type="text" value="ma_piece">
     <div class="rangee"><button id="lancer-nouveau">Lancer</button></div>

@@ -82,20 +82,65 @@ async function preparerPhoto(fichier) {
   return { nom, octets: await blob.arrayBuffer() };
 }
 
-function vignettes(fichiers, cible) {
-  cible.replaceChildren(...[...fichiers].map((f, i) => {
-    const fig = document.createElement("figure");
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(f);
-    img.alt = f.name;
-    const leg = document.createElement("figcaption");
-    leg.textContent = i + 1;
-    fig.append(img, leg);
-    return fig;
-  }));
+// Sélecteur de photos : appareil photo (une page après l'autre) ou galerie,
+// liste ordonnée avec vignettes numérotées ; ◀ avance une photo d'un cran, ✕ la retire.
+function selecteurPhotos(conteneur) {
+  const liste = []; // [{fichier, url}]
+  conteneur.classList.add("selecteur");
+  conteneur.innerHTML = `
+    <div class="rangee">
+      <button type="button" data-action="camera">📷 Prendre une photo</button>
+      <button type="button" class="second" data-action="galerie">Ajouter depuis la galerie</button>
+      <span class="compte"></span>
+    </div>
+    <input type="file" accept="image/*" capture="environment" data-role="camera">
+    <input type="file" accept="image/*" multiple data-role="galerie">
+    <div class="vignettes"></div>`;
+  const zone = conteneur.querySelector(".vignettes");
+  const compte = conteneur.querySelector(".compte");
+
+  function afficher() {
+    compte.textContent = liste.length ? `${liste.length} photo${liste.length > 1 ? "s" : ""}` : "";
+    zone.replaceChildren(...liste.map((p, i) => {
+      const fig = document.createElement("figure");
+      const img = document.createElement("img");
+      img.src = p.url;
+      img.alt = `Photo ${i + 1}`;
+      const leg = document.createElement("figcaption");
+      leg.textContent = i + 1;
+      const outils = document.createElement("div");
+      outils.className = "outils";
+      const avant = document.createElement("button");
+      avant.type = "button";
+      avant.textContent = "◀";
+      avant.title = "Placer avant";
+      avant.disabled = i === 0;
+      avant.addEventListener("click", () => { [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]]; afficher(); });
+      const retirer = document.createElement("button");
+      retirer.type = "button";
+      retirer.textContent = "✕";
+      retirer.title = "Retirer";
+      retirer.addEventListener("click", () => { URL.revokeObjectURL(p.url); liste.splice(i, 1); afficher(); });
+      outils.append(avant, retirer);
+      fig.append(img, leg, outils);
+      return fig;
+    }));
+  }
+
+  for (const role of ["camera", "galerie"]) {
+    const entree = conteneur.querySelector(`[data-role=${role}]`);
+    conteneur.querySelector(`[data-action=${role}]`).addEventListener("click", () => entree.click());
+    entree.addEventListener("change", () => {
+      for (const f of entree.files) liste.push({ fichier: f, url: URL.createObjectURL(f) });
+      entree.value = ""; // permet de reprendre la même photo / d'en ajouter d'autres
+      afficher();
+      demarrerMoteur(); // le moteur se charge pendant qu'on photographie
+    });
+  }
+  return { fichiers: () => liste.map((p) => p.fichier) };
 }
 
-$("#photos").addEventListener("change", (e) => { vignettes(e.target.files, $("#vignettes")); demarrerMoteur(); });
+const photosNouveau = selecteurPhotos($("#photos"));
 
 // ---------------------------------------------------------------------------
 // Personnes (mise à jour)
@@ -107,16 +152,12 @@ function ajouterPersonne(nom = "") {
   bloc.innerHTML = `
     <div class="rangee">
       <input type="text" placeholder="Prénom (auteur des modifications)">
-      <button class="second" title="Retirer">✕</button>
+      <button class="second" title="Retirer cette personne">✕</button>
     </div>
-    <div class="rangee"><input type="file" accept="image/*" multiple></div>
-    <div class="vignettes"></div>`;
+    <div class="photos-personne"></div>`;
   bloc.querySelector("input[type=text]").value = nom;
   bloc.querySelector("button").addEventListener("click", () => bloc.remove());
-  bloc.querySelector("input[type=file]").addEventListener("change", (e) => {
-    vignettes(e.target.files, bloc.querySelector(".vignettes"));
-    demarrerMoteur();
-  });
+  bloc.selecteur = selecteurPhotos(bloc.querySelector(".photos-personne"));
   $("#personnes").append(bloc);
 }
 ajouterPersonne();
@@ -209,9 +250,9 @@ async function lancer(message) {
 
 $("#lancer-nouveau").addEventListener("click", () => {
   const r = reglagesValides();
-  const fichiers = [...$("#photos").files];
+  const fichiers = photosNouveau.fichiers();
   if (!r) return;
-  if (!fichiers.length) return alert("Choisissez au moins une photo.");
+  if (!fichiers.length) return alert("Prenez ou choisissez au moins une photo.");
   lancer(async () => {
     $("#etape").textContent = "Préparation des photos…";
     return {
@@ -227,7 +268,7 @@ $("#lancer-maj").addEventListener("click", () => {
   const ref = $("#reference").files[0];
   if (!ref) return alert("Choisissez le document de référence (.docx).");
   const blocs = [...document.querySelectorAll(".personne")]
-    .map((b) => ({ nom: b.querySelector("input[type=text]").value.trim(), fichiers: [...b.querySelector("input[type=file]").files] }))
+    .map((b) => ({ nom: b.querySelector("input[type=text]").value.trim(), fichiers: b.selecteur.fichiers() }))
     .filter((p) => p.fichiers.length);
   if (!blocs.length) return alert("Ajoutez les photos d'au moins une personne.");
   if (blocs.some((p) => !p.nom)) return alert("Indiquez le prénom de chaque personne.");
