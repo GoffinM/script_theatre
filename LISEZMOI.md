@@ -120,7 +120,7 @@ Le champ `docx_reference` peut désigner un fichier Word dont les styles de mêm
 
 ```
 python -m venv .venv
-.venv\Scripts\python -m pip install --use-feature=truststore opencv-python-headless numpy pyyaml python-dotenv anthropic python-docx truststore
+.venv\Scripts\python -m pip install --use-feature=truststore opencv-python-headless numpy pyyaml python-dotenv anthropic python-docx fpdf2 truststore
 ```
 
 La clé d'API se trouve dans `.env` (modèle : `.env.example`).
