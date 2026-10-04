@@ -12,7 +12,9 @@ C'est une page statique, publiable telle quelle sur GitHub Pages. Le code Python
 
 - **Premier lancement :** environ 40 Mo sont téléchargés (Python, OpenCV), puis gardés en cache.
 - **Clé d'API :** chacun saisit sa clé dans « Réglages », et elle reste enregistrée sur son appareil. Conseil : créez sur console.anthropic.com une clé par personne, avec un plafond de dépense.
+- **Photos :** « 📷 Prendre une photo » ouvre l'appareil photo, une page après l'autre ; on peut aussi ajouter des photos depuis la galerie. Les photos sont enregistrées sur l'appareil dès qu'elles sont prises : elles ne se perdent pas si le navigateur recharge la page. ◀ change l'ordre, ✕ retire une photo.
 - **Onglet « Nouveau document » :** photos → DOCX, DOCX à annoter (numéroté) et rapport.
+- **Onglet « Mes documents » :** chaque résultat y est enregistré automatiquement, sur l'appareil uniquement. On peut le retélécharger, le partager, le supprimer, ou utiliser un document transcrit comme référence d'une mise à jour.
 - **Onglet « Mise à jour » :** DOCX de référence + photos annotées par personne → DOCX en suivi des modifications et rapport.
 - **Profil :** « Réglages > Modifier le profil » permet par exemple d'adapter la liste des personnages. Le profil modifié est enregistré sur l'appareil.
 - **Pas de PDF** dans le navigateur : ouvrir le DOCX dans Word, Pages ou Google Docs pour l'exporter.

@@ -50,9 +50,9 @@
   button.second { background: var(--accent-doux); color: var(--accent); }
   button:disabled { opacity: .45; cursor: not-allowed; }
   .rangee { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-  .onglets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--ligne);
+  .onglets { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; background: var(--ligne);
              padding: 4px; border-radius: 12px; margin-bottom: 16px; }
-  .onglets button { background: transparent; color: var(--texte); font-weight: 500; }
+  .onglets button { background: transparent; color: var(--texte); font-weight: 500; padding: 10px 6px; font-size: .92rem; }
   .onglets button[aria-selected=true] { background: var(--carte); color: var(--accent); font-weight: 700; }
   details > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex;
                       justify-content: space-between; align-items: center; }
@@ -83,9 +83,15 @@
   .fichier span { overflow-wrap: anywhere; font-size: .92rem; }
   .fichier .rangee { margin: 0; flex-wrap: nowrap; }
   .fichier button { padding: 8px 12px; min-height: 38px; font-size: .9rem; }
-  #rapport { font-size: .9rem; margin-top: 12px; }
-  #rapport h3 { font-size: .95rem; margin: 14px 0 4px; }
-  #rapport ul { margin: 0; padding-left: 18px; }
+  .rapport { font-size: .9rem; margin-top: 12px; }
+  .rapport > summary { font-weight: 600; }
+  .rapport h3 { font-size: .95rem; margin: 14px 0 4px; }
+  .rapport ul { margin: 0; padding-left: 18px; }
+  .archive { border-top: 1px solid var(--ligne); padding: 14px 0 6px; }
+  .archive:first-child { border-top: 0; padding-top: 0; }
+  .archive-tete { display: flex; flex-direction: column; gap: 2px; }
+  .archive-tete strong { overflow-wrap: anywhere; }
+  .note-ref { color: var(--ok); font-size: .9rem; font-weight: 600; margin: 6px 0 0; }
   .erreur { color: var(--alerte); font-weight: 600; }
   .etat { font-size: .9rem; }
   .ok { color: var(--ok); }
@@ -127,6 +133,7 @@
   <div class="onglets" role="tablist">
     <button role="tab" aria-selected="true" data-onglet="nouveau">Nouveau document</button>
     <button role="tab" aria-selected="false" data-onglet="maj">Mise à jour</button>
+    <button role="tab" aria-selected="false" data-onglet="documents">Mes documents</button>
   </div>
 
   <section class="carte" id="onglet-nouveau">
@@ -144,12 +151,20 @@
     <h2>Intégrer des annotations</h2>
     <label for="reference">Document de référence (.docx produit par l'outil, validé dans Word)</label>
     <input id="reference" type="file" accept=".docx">
+    <p class="note-ref" id="reference-archive" hidden></p>
+    <p class="aide">Ou bien : « Mes documents » → « Utiliser comme référence ».</p>
     <label>Pages annotées, une série par personne</label>
     <div id="personnes"></div>
     <div class="rangee"><button class="second" id="ajouter-personne">+ Ajouter une personne</button></div>
     <label for="nom-maj">Nom du document produit</label>
     <input id="nom-maj" type="text" value="ma_piece_maj">
     <div class="rangee"><button id="lancer-maj">Lancer</button></div>
+  </section>
+
+  <section class="carte" id="onglet-documents" hidden>
+    <h2>Mes documents</h2>
+    <p class="aide" style="margin-top:-6px">Enregistrés sur cet appareil uniquement.</p>
+    <div id="archives"></div>
   </section>
 
   <section class="carte" id="suivi" hidden>
