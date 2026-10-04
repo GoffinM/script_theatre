@@ -1,0 +1,9 @@
+Copyright © 2026 M&M's productions. Tous droits réservés.
+
+Le code source de ce dépôt est consultable publiquement, mais aucune licence
+d'utilisation, de copie, de modification ou de redistribution n'est accordée
+sans l'autorisation écrite de M&M's productions.
+
+Exceptions (composants de tiers, sous leur propre licence) :
+- web/wheels/python_docx-1.2.0-py3-none-any.whl : python-docx, licence MIT.
+- Bibliothèques chargées depuis un CDN (Pyodide, SDK Anthropic) : sous leur propre licence.

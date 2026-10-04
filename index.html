@@ -95,6 +95,12 @@
   .erreur { color: var(--alerte); font-weight: 600; }
   .etat { font-size: .9rem; }
   .ok { color: var(--ok); }
+  .bandeau { max-width: 680px; margin: 24px auto 0; padding: 14px 16px; border-radius: var(--rayon);
+             background: var(--accent); color: #fff; display: flex; flex-wrap: wrap; gap: 4px 12px;
+             justify-content: space-between; align-items: baseline; font-size: .85rem; }
+  .bandeau strong { font: 600 1rem/1.2 Georgia, "Times New Roman", serif; letter-spacing: .02em; }
+  .bandeau span { opacity: .85; }
+  .version { color: var(--doux); font-size: .8rem; margin: 14px 0 0; }
 </style>
 </head>
 <body>
@@ -143,6 +149,7 @@
       </div>
     </details>
     <div class="rangee"><button id="enregistrer">Enregistrer les réglages</button></div>
+    <p class="version" id="version"></p>
   </details>
 
   <div class="onglets" role="tablist">
@@ -190,6 +197,10 @@
     <div id="resultat"></div>
   </section>
 </main>
+<footer class="bandeau">
+  <strong>M&amp;M's productions</strong>
+  <span id="copyright">© 2026 M&amp;M's productions — Tous droits réservés</span>
+</footer>
 <script type="module" src="web/app.js"></script>
 </body>
 </html>

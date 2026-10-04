@@ -2,6 +2,7 @@
 // dans le Web Worker web/moteur.js ; ici : réglages, photos, suivi, résultats, archives.
 
 import { archives, brouillons, travaux } from "./stockage.js";
+import { DATE_VERSION, EDITEUR, VERSION } from "./version.js";
 
 const $ = (s) => document.querySelector(s);
 const TAILLE_MAX = 2000; // côté le plus long des photos envoyées au moteur (pixels)
@@ -33,6 +34,10 @@ function majEtatCle() {
   $("#etat-cle").className = "etat " + (ok ? "ok" : "erreur");
   if (!ok) $("#reglages").open = true;
 }
+
+const dateVersion = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(new Date(DATE_VERSION));
+$("#version").textContent = `Remise en forme — version ${VERSION} du ${dateVersion} — © ${DATE_VERSION.slice(0, 4)} ${EDITEUR}`;
+$("#copyright").textContent = `© ${DATE_VERSION.slice(0, 4)} ${EDITEUR} — Tous droits réservés — v${VERSION}`;
 
 $("#cle").value = stock.lire("cle");
 $("#modele").value = stock.lire("modele", "claude-opus-5-5");

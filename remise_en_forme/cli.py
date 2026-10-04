@@ -25,6 +25,9 @@ def _rotations(valeurs: list[str]) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="remise-en-forme",
                                  description="Photos de pages imprimées -> document mis en forme.")
+    from . import __version__
+    ap.add_argument("--version", action="version",
+                    version=f"remise-en-forme {__version__} — © 2026 M&M's productions")
     sub = ap.add_subparsers(dest="etape", required=True)
 
     def commun(p, profil=False, force=False):

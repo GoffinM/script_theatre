@@ -124,3 +124,6 @@ python -m venv .venv
 ```
 
 La clé d'API se trouve dans `.env` (modèle : `.env.example`).
+
+---
+© 2026 M&M's productions — Tous droits réservés. Voir [LICENSE](LICENSE).

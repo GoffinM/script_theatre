@@ -1,6 +1,6 @@
 [project]
 name = "remise-en-forme"
-version = "0.1.0"
+version = "0.5.0"
 description = "Photos de pages imprimées -> DOCX/PDF mis en forme selon un profil"
 requires-python = ">=3.10"
 dependencies = ["opencv-python-headless", "numpy", "pyyaml", "python-dotenv", "anthropic", "python-docx", "truststore"]

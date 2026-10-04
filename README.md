@@ -6,3 +6,6 @@ Photos de pages imprimées (théâtre, roman…) → document Word mis en forme 
 - **Ligne de commande** : `python -m remise_en_forme …`
 
 Mode d'emploi complet : [LISEZMOI.md](LISEZMOI.md).
+
+---
+© 2026 M&M's productions — Tous droits réservés. Voir [LICENSE](LICENSE).
