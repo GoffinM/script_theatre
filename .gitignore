@@ -1,0 +1,10 @@
+.venv/
+.env
+__pycache__/
+.claude/
+# sorties et essais
+sortie/
+sortie_*/
+eval/
+# photos de livres : protégées par le droit d'auteur, ne pas publier
+exemple/

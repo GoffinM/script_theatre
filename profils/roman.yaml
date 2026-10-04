@@ -1,0 +1,65 @@
+# Profil « roman » — prose narrative avec chapitres, épigraphes, dialogues et notes.
+nom: roman
+description: Roman (chapitres, épigraphes, paragraphes de narration, dialogues, notes de bas de page).
+
+conventions: |
+  - Un chapitre commence par son titre (ex. « Chapitre II »), parfois suivi
+    d'une épigraphe (citation en italique, souvent en retrait à droite).
+  - La narration est en romain. Un nouveau paragraphe commence sur une
+    nouvelle ligne (la ligne précédente est souvent plus courte).
+  - Les paroles des personnages sont en italique, entre « » ou introduites
+    par un tiret « – ». Chaque ligne de dialogue commençant par un tiret est
+    un élément distinct.
+  - Une note de bas de page est séparée du texte par un filet et commence
+    par son numéro d'appel.
+
+# Dans ce type de livre, un paragraphe se termine par une ligne courte finie
+# par une ponctuation (pas de ligne vide entre paragraphes) : l'étape 4 coupe
+# les paragraphes à ces lignes. `seuil` = fraction d'une ligne pleine.
+paragraphes:
+  coupure: lignes_courtes
+  seuil: 0.8
+
+champs:
+  suite:
+    type: booleen
+    description: true si l'élément continue un élément commencé à la page précédente (pas de début de paragraphe en haut de page).
+
+elements:
+  titre_chapitre:
+    description: Titre de chapitre (ex. « Chapitre II »).
+    style: Titre chapitre
+    italique_source: false
+  epigraphe:
+    description: Citation placée en tête de chapitre.
+    style: Épigraphe
+  paragraphe:
+    description: Paragraphe de narration (peut contenir des mots en _italique_ ou des paroles citées).
+    champs: [suite]
+    style: Paragraphe
+  dialogue:
+    description: >
+      Paroles isolées sur leur(s) ligne(s) : passage entre « » ou ligne
+      commençant par un tiret de dialogue.
+    champs: [suite]
+    style: Dialogue
+  note:
+    description: Note de bas de page, numéro d'appel compris.
+    style: Note
+  autre:
+    description: Tout texte qui n'entre dans aucune autre catégorie (à vérifier).
+    style: Normal
+
+mise_en_page:
+  police: Garamond
+  taille: 12
+  marges_cm: 2.5
+  reference_page: aucune
+  styles:
+    Titre chapitre:  {taille: 20, centre: true, espace_avant: 72, espace_apres: 24}
+    Épigraphe:       {italique: true, taille: 10.5, retrait_gauche: 6.0, espace_apres: 24}
+    Paragraphe:      {espace_apres: 4}
+    Dialogue:        {espace_apres: 4}
+    Note:            {taille: 9, espace_avant: 6, espace_apres: 6}
+    Référence page:  {caractere: true, taille: 8, couleur: "999999"}
+  docx_reference: null

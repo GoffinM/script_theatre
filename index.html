@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Remise en forme</title>
+<meta name="description" content="Photos de pages imprimées → document Word mis en forme ; intégration des annotations de répétition.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%238a1c2b'/><path d='M9 8h11l3 3v13H9z' fill='%23fff'/><path d='M12 14h8M12 17h8M12 20h5' stroke='%238a1c2b' stroke-width='1.6'/></svg>">
+<style>
+  :root {
+    --fond: #f6f3ee; --carte: #ffffff; --texte: #1e1b18; --doux: #6b645c; --ligne: #e3ddd3;
+    --accent: #8a1c2b; --accent-doux: #f4e4e6; --ok: #2f6b3a; --alerte: #a2541a;
+    --rayon: 14px; --ombre: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fond: #17140f; --carte: #221e18; --texte: #eee8df; --doux: #a59d92; --ligne: #3a332a;
+      --accent: #e0707e; --accent-doux: #3a2226; --ok: #7fc48b; --alerte: #e4a066;
+      --ombre: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fond: #17140f; --carte: #221e18; --texte: #eee8df; --doux: #a59d92; --ligne: #3a332a;
+    --accent: #e0707e; --accent-doux: #3a2226; --ok: #7fc48b; --alerte: #e4a066; --ombre: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fond); color: var(--texte);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 680px; margin: 0 auto; }
+  h1 { font: 600 1.6rem/1.2 Georgia, "Times New Roman", serif; margin: 8px 0 2px; }
+  .sous { color: var(--doux); margin: 0 0 20px; }
+  .carte { background: var(--carte); border: 1px solid var(--ligne); border-radius: var(--rayon);
+           box-shadow: var(--ombre); padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  label { display: block; font-weight: 600; font-size: .92rem; margin: 12px 0 4px; }
+  .aide { color: var(--doux); font-size: .85rem; margin: 4px 0 0; }
+  input[type=text], input[type=password], select, textarea {
+    width: 100%; font: inherit; color: inherit; background: var(--fond);
+    border: 1px solid var(--ligne); border-radius: 10px; padding: 10px 12px;
+  }
+  textarea { font: 13px/1.45 ui-monospace, Consolas, monospace; min-height: 220px; }
+  input[type=file] { width: 100%; font-size: .9rem; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 12px 16px;
+    background: var(--accent); color: #fff; cursor: pointer; min-height: 44px;
+  }
+  button.second { background: var(--accent-doux); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .rangee { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .onglets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--ligne);
+             padding: 4px; border-radius: 12px; margin-bottom: 16px; }
+  .onglets button { background: transparent; color: var(--texte); font-weight: 500; }
+  .onglets button[aria-selected=true] { background: var(--carte); color: var(--accent); font-weight: 700; }
+  details > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex;
+                      justify-content: space-between; align-items: center; }
+  details > summary::after { content: "▾"; color: var(--doux); }
+  details[open] > summary::after { content: "▴"; }
+  .vignettes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .vignettes figure { margin: 0; position: relative; }
+  .vignettes img { width: 64px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid var(--ligne); }
+  .vignettes figcaption { position: absolute; top: 2px; left: 4px; font-size: .7rem; font-weight: 700;
+                          color: #fff; text-shadow: 0 0 3px #000; }
+  .personne { border: 1px dashed var(--ligne); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .personne .rangee { margin-top: 6px; }
+  .personne input[type=text] { flex: 1; min-width: 140px; }
+  #suivi[hidden], [hidden] { display: none !important; }
+  .barre { height: 8px; background: var(--ligne); border-radius: 99px; overflow: hidden; margin: 8px 0; }
+  .barre > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #journal { font: 12px/1.45 ui-monospace, Consolas, monospace; color: var(--doux); max-height: 180px;
+             overflow: auto; white-space: pre-wrap; background: var(--fond); border-radius: 8px; padding: 8px; }
+  .fichiers { display: grid; gap: 8px; margin-top: 12px; }
+  .fichier { display: flex; gap: 8px; align-items: center; justify-content: space-between;
+             border: 1px solid var(--ligne); border-radius: 10px; padding: 8px 8px 8px 12px; }
+  .fichier span { overflow-wrap: anywhere; font-size: .92rem; }
+  .fichier .rangee { margin: 0; flex-wrap: nowrap; }
+  .fichier button { padding: 8px 12px; min-height: 38px; font-size: .9rem; }
+  #rapport { font-size: .9rem; margin-top: 12px; }
+  #rapport h3 { font-size: .95rem; margin: 14px 0 4px; }
+  #rapport ul { margin: 0; padding-left: 18px; }
+  .erreur { color: var(--alerte); font-weight: 600; }
+  .etat { font-size: .9rem; }
+  .ok { color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Remise en forme</h1>
+  <p class="sous">Photos de pages imprimées → document Word mis en forme. Intègre aussi les annotations des répétitions.</p>
+
+  <details class="carte" id="reglages">
+    <summary>Réglages <span class="etat" id="etat-cle"></span></summary>
+    <label for="cle">Clé d'API Anthropic</label>
+    <input id="cle" type="password" autocomplete="off" placeholder="sk-ant-…">
+    <p class="aide">Elle reste enregistrée sur cet appareil uniquement et part directement vers Anthropic.
+      Conseil : créez une clé par personne sur console.anthropic.com, avec un plafond de dépense mensuel.</p>
+    <label for="modele">Modèle</label>
+    <select id="modele">
+      <option value="claude-opus-5-5">Opus 5.5 — le plus fiable (≈ 3 centimes / page)</option>
+      <option value="claude-sonnet-5-5">Sonnet 5.5 — moins cher, quelques erreurs mesurées</option>
+    </select>
+    <label for="profil">Profil de mise en forme</label>
+    <select id="profil">
+      <option value="theatre">Théâtre</option>
+      <option value="roman">Roman</option>
+    </select>
+    <p class="aide">Pour une nouvelle pièce, adaptez la liste <code>personnages</code> ci-dessous.</p>
+    <details style="margin-top:10px">
+      <summary style="font-weight:600">Modifier le profil</summary>
+      <textarea id="profil-texte" spellcheck="false"></textarea>
+      <div class="rangee">
+        <button class="second" id="profil-enregistrer">Enregistrer le profil</button>
+        <button class="second" id="profil-defaut">Revenir au profil d'origine</button>
+      </div>
+    </details>
+    <div class="rangee"><button id="enregistrer">Enregistrer les réglages</button></div>
+  </details>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" aria-selected="true" data-onglet="nouveau">Nouveau document</button>
+    <button role="tab" aria-selected="false" data-onglet="maj">Mise à jour</button>
+  </div>
+
+  <section class="carte" id="onglet-nouveau">
+    <h2>Transcrire des pages</h2>
+    <label for="photos">Photos des pages, dans l'ordre</label>
+    <input id="photos" type="file" accept="image/*" multiple>
+    <p class="aide">Une ou deux pages par photo, dans n'importe quel sens. L'ordre est celui de la sélection.</p>
+    <div class="vignettes" id="vignettes"></div>
+    <label for="nom">Nom du document</label>
+    <input id="nom" type="text" value="ma_piece">
+    <div class="rangee"><button id="lancer-nouveau">Lancer</button></div>
+  </section>
+
+  <section class="carte" id="onglet-maj" hidden>
+    <h2>Intégrer des annotations</h2>
+    <label for="reference">Document de référence (.docx produit par l'outil, validé dans Word)</label>
+    <input id="reference" type="file" accept=".docx">
+    <label>Pages annotées, une série par personne</label>
+    <div id="personnes"></div>
+    <div class="rangee"><button class="second" id="ajouter-personne">+ Ajouter une personne</button></div>
+    <label for="nom-maj">Nom du document produit</label>
+    <input id="nom-maj" type="text" value="ma_piece_maj">
+    <div class="rangee"><button id="lancer-maj">Lancer</button></div>
+  </section>
+
+  <section class="carte" id="suivi" hidden>
+    <h2>Suivi</h2>
+    <div class="etat" id="etape">…</div>
+    <div class="barre"><div id="barre"></div></div>
+    <details><summary style="font-weight:500;font-size:.9rem">Détails</summary><div id="journal"></div></details>
+    <div id="resultat"></div>
+  </section>
+</main>
+<script type="module" src="web/app.js"></script>
+</body>
+</html>

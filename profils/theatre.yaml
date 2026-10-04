@@ -1,0 +1,83 @@
+# Profil « théâtre » — décrit ce que l'étape 3 doit étiqueter et comment l'étape 5
+# met en page. Pour une autre pièce : copier ce fichier et changer `personnages`.
+nom: theatre
+description: Texte de théâtre (répliques, didascalies, liste des personnages).
+
+# Liste fermée : tout nom de personnage hors liste est signalé à l'étape 4.
+personnages:
+  - JEAN-BERNARD
+  - ANTOINE
+
+# Convention typographique du livre source (aide l'étiquetage).
+conventions: |
+  - Une réplique commence par le nom du personnage en MAJUSCULES suivi d'un
+    point, puis le texte sur la même ligne (ex. « ANTOINE. Oui. »).
+  - Une didascalie est un passage court en italique (marqué _ainsi_ dans la
+    transcription), seul sur sa ligne (ex. « _Un temps._ »).
+  - Un mot en italique à l'intérieur d'une réplique reste dans la réplique.
+  - Le début du livre peut contenir un titre, une dédicace et la liste des
+    personnages.
+
+# Champs supplémentaires utilisables par les éléments (type : texte | booleen).
+champs:
+  personnage:
+    type: texte
+    description: Nom du personnage tel qu'imprimé, sans le point final ; null si absent.
+  suite:
+    type: booleen
+    description: true si l'élément continue un élément commencé à la page précédente.
+
+# Types d'éléments que l'étape 3 peut produire. `champs` = champs en plus de
+# `texte` ; `style` = style du document final (défini plus bas).
+elements:
+  titre:
+    description: Titre de la pièce.
+    style: Titre pièce
+    italique_source: false   # la mise en forme vient du style, pas de la photo
+  dedicace:
+    description: Dédicace ou sous-titre de la page de titre (ex. « pour X »).
+    style: Dédicace
+    italique_source: false   # la mise en forme vient du style, pas de la photo
+  titre_personnages:
+    description: Intitulé de la liste des personnages (ex. « PERSONNAGES »).
+    style: Titre liste
+    italique_source: false   # la mise en forme vient du style, pas de la photo
+  personnage_liste:
+    description: Un nom dans la liste des personnages (une entrée par nom).
+    style: Liste personnages
+    italique_source: false   # la mise en forme vient du style, pas de la photo
+  replique:
+    description: >
+      Une réplique. `personnage` = le nom imprimé en majuscules au début
+      (sans le point). Si la page commence par la suite d'une réplique de la page
+      précédente (pas de nom au début), mettre `personnage` à null et
+      `suite` à true.
+    champs: [personnage, suite]
+    style: Réplique
+  didascalie:
+    description: Indication scénique isolée, en italique.
+    style: Didascalie
+  autre:
+    description: Tout texte qui n'entre dans aucune autre catégorie (à vérifier).
+    style: Normal
+
+# Mise en page (étape 5). Tailles en points, retraits en cm.
+mise_en_page:
+  police: Garamond
+  taille: 12
+  marges_cm: 2.5
+  reference_page: aucune     # fin | aucune — rappel discret « [p. 157] » en fin de réplique
+                             # (la page source reste toujours dans 04_controles/document.json)
+  saut_apres_liste: true     # saut de page après la liste des personnages
+  styles:
+    Titre pièce:        {taille: 24, gras: true, centre: true, espace_avant: 120, espace_apres: 24}
+    Dédicace:           {italique: true, centre: true, espace_apres: 48}
+    Titre liste:        {taille: 14, majuscules: true, centre: true, espace_avant: 24, espace_apres: 12}
+    Liste personnages:  {centre: true, espace_apres: 2}
+    Réplique:           {espace_apres: 6, retrait_negatif: 0.0}
+    Personnage:         {caractere: true, majuscules: true, gras: false, petites_capitales: false}
+    Didascalie:         {italique: true, retrait_gauche: 2.0, espace_apres: 6}
+    Référence page:     {caractere: true, taille: 8, couleur: "999999"}
+  # Option : un .docx de référence dont les styles remplacent ceux-ci
+  # (mêmes noms de styles). Chemin relatif au dossier du profil.
+  docx_reference: null
