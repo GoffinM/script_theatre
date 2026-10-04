@@ -3,11 +3,12 @@
 //  - « travaux »    : le traitement lancé (entrées, mode, lots confiés à Anthropic, état) ;
 //  - « reponses »   : chaque réponse de Claude dès sa réception — un traitement interrompu
 //                     reprend là où il s'était arrêté, sans repayer ce qui est fait ;
-//  - « archives »   : chaque résultat produit, consultable dans « Mes documents ».
+//  - « archives »   : chaque résultat produit, consultable dans « Mes documents » ;
+//  - « projets »    : nom, profil (YAML, dont les personnages), modèle de mise en page (DOCX).
 // Tout reste sur l'appareil ; rien n'est envoyé ailleurs.
 
 const BASE = "remise-en-forme";
-const VERSION = 2;
+const VERSION = 3;
 let ouverture = null;
 
 function base() {
@@ -20,6 +21,7 @@ function base() {
         if (!db.objectStoreNames.contains("archives")) db.createObjectStore("archives", { keyPath: "id" });
         if (!db.objectStoreNames.contains("travaux")) db.createObjectStore("travaux", { keyPath: "id" });
         if (!db.objectStoreNames.contains("reponses")) db.createObjectStore("reponses");
+        if (!db.objectStoreNames.contains("projets")) db.createObjectStore("projets", { keyPath: "id" });
       };
       req.onsuccess = () => ok(req.result);
       req.onerror = () => ko(req.error);
@@ -96,4 +98,13 @@ export const reponses = {
       req.onerror = () => ok(out);
     });
   },
+};
+
+export const projets = {
+  // projet : {id, nom, base: "theatre"|"roman", profil: texte YAML, miseEnPage: {nom, blob} | null, date}
+  ecrire: (p) => sur(operation("projets", "readwrite", (s) => s.put(p))),
+  lire: (id) => sur(operation("projets", "readonly", (s) => s.get(id)), undefined),
+  tous: async () => ((await sur(operation("projets", "readonly", (s) => s.getAll()), [])) || [])
+    .sort((a, b) => a.nom.localeCompare(b.nom, "fr")),
+  supprimer: (id) => sur(operation("projets", "readwrite", (s) => s.delete(id))),
 };

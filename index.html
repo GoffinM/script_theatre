@@ -134,23 +134,50 @@
         navigateur : ils passent par un petit relais gratuit (Cloudflare, 5 minutes à installer, ne
         conserve aucune clé). Mode d'emploi : fichier <code>outils/relais-cloudflare.js</code> du dépôt.</p>
     </div>
-    <label for="profil">Profil de mise en forme</label>
-    <select id="profil">
-      <option value="theatre">Théâtre</option>
-      <option value="roman">Roman</option>
-    </select>
-    <p class="aide">Pour une nouvelle pièce, adaptez la liste <code>personnages</code> ci-dessous.</p>
-    <details style="margin-top:10px">
-      <summary style="font-weight:600">Modifier le profil</summary>
-      <textarea id="profil-texte" spellcheck="false"></textarea>
-      <div class="rangee">
-        <button class="second" id="profil-enregistrer">Enregistrer le profil</button>
-        <button class="second" id="profil-defaut">Revenir au profil d'origine</button>
-      </div>
-    </details>
     <div class="rangee"><button id="enregistrer">Enregistrer les réglages</button></div>
     <p class="version" id="version"></p>
   </details>
+
+  <section class="carte" id="carte-projet">
+    <div class="rangee" style="margin-top:0">
+      <label for="projet" style="margin:0">Projet</label>
+      <select id="projet" style="flex:1;min-width:160px"></select>
+      <button class="second" id="nouveau-projet" type="button">+ Nouveau</button>
+    </div>
+    <details id="details-projet" style="margin-top:10px">
+      <summary style="font-weight:600">Réglages du projet <span class="aide" id="resume-projet" style="font-weight:400"></span></summary>
+      <label for="projet-nom">Nom du projet</label>
+      <input id="projet-nom" type="text">
+      <label for="projet-base">Type de texte</label>
+      <select id="projet-base">
+        <option value="theatre">Théâtre</option>
+        <option value="roman">Roman</option>
+      </select>
+      <p class="aide">Tous les documents du projet sont mis en forme de la même façon : même profil
+        (dont la liste des personnages) et même modèle de mise en page.</p>
+      <details style="margin-top:10px">
+        <summary style="font-weight:600">Profil (personnages, types d'éléments…)</summary>
+        <textarea id="profil-texte" spellcheck="false"></textarea>
+        <p class="aide">Pour une pièce, adaptez au moins la liste <code>personnages</code>.</p>
+        <div class="rangee"><button class="second" id="profil-defaut" type="button">Revenir au profil d'origine</button></div>
+      </details>
+      <label>Modèle de mise en page</label>
+      <p class="aide" id="etat-modele" style="margin-top:0"></p>
+      <p class="aide">1. Téléchargez le modèle de départ. 2. Dans Word, modifiez ses <strong>styles</strong>
+        (Accueil › Styles › clic droit › Modifier : police, taille, retraits, espacements) sans les renommer,
+        puis enregistrez. 3. Déposez-le ici : tous les documents du projet (DOCX et PDF) suivront ces styles.</p>
+      <div class="rangee">
+        <button class="second" id="modele-depart" type="button">Télécharger le modèle de départ</button>
+        <button class="second" id="modele-deposer" type="button">Déposer un modèle (.docx)</button>
+        <button class="second" id="modele-retirer" type="button" hidden>Retirer le modèle</button>
+        <input id="modele-fichier" type="file" accept=".docx" hidden>
+      </div>
+      <div class="rangee">
+        <button id="projet-enregistrer" type="button">Enregistrer le projet</button>
+        <button class="second" id="projet-supprimer" type="button">Supprimer le projet</button>
+      </div>
+    </details>
+  </section>
 
   <div class="onglets" role="tablist">
     <button role="tab" aria-selected="true" data-onglet="nouveau">Nouveau document</button>
@@ -169,6 +196,17 @@
     <div class="rangee"><button id="lancer-nouveau">Lancer</button></div>
   </section>
 
+  <section class="carte" id="carte-import">
+    <h2>Ou importer un document déjà propre</h2>
+    <p class="aide" style="margin-top:-6px">PDF, DOCX ou TXT : il est remis au format du projet
+      (les pages scannées d'un PDF sont transcrites). Ancien format .doc : l'enregistrer d'abord en DOCX ou PDF.</p>
+    <label for="fichier-import">Document</label>
+    <input id="fichier-import" type="file" accept=".pdf,.docx,.txt,.doc,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+    <label for="nom-import">Nom du document produit</label>
+    <input id="nom-import" type="text" placeholder="(nom du fichier)">
+    <div class="rangee"><button id="lancer-import">Importer</button></div>
+  </section>
+
   <section class="carte" id="onglet-maj" hidden>
     <h2>Intégrer des annotations</h2>
     <label for="reference">Document de référence (.docx produit par l'outil, validé dans Word)</label>
@@ -184,8 +222,8 @@
   </section>
 
   <section class="carte" id="onglet-documents" hidden>
-    <h2>Mes documents</h2>
-    <p class="aide" style="margin-top:-6px">Enregistrés sur cet appareil uniquement.</p>
+    <h2>Mes documents <span class="aide" id="titre-documents" style="font-weight:400"></span></h2>
+    <p class="aide" style="margin-top:-6px">Documents du projet choisi, enregistrés sur cet appareil uniquement.</p>
     <div id="archives"></div>
   </section>
 

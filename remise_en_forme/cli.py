@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> None:
         if profil:
             p.add_argument("-p", "--profil", default="theatre",
                            help="nom (profils/<nom>.yaml) ou chemin d'un profil YAML")
+            p.add_argument("--mise-en-page", type=Path, default=None, metavar="MODELE.docx",
+                           help="modèle de mise en page (DOCX de styles, voir la commande creer-modele)")
         if force:
             p.add_argument("--force", action="store_true", help="refait les appels API déjà faits")
             p.add_argument("--modele", default="claude-opus-5-5",
@@ -75,11 +77,31 @@ def main(argv: list[str] | None = None) -> None:
     commun(p, profil=True, force=True)
     p.add_argument("--nom", default=None, help="nom du DOCX produit (défaut : <référence>_maj)")
 
+    p = sub.add_parser("importer", help="Document déjà propre (TXT, DOCX, PDF) → même mise en forme "
+                                        "(remplace les étapes 1 et 2, puis étapes 3 à 5)")
+    p.add_argument("fichier", type=Path, help="fichier TXT, DOCX ou PDF")
+    commun(p, profil=True, force=True); rendu(p)
+    p = sub.add_parser("creer-modele", help="Modèle de mise en page de départ (DOCX) à retoucher dans Word")
+    p.add_argument("fichier", type=Path, help="DOCX à créer")
+    p.add_argument("-p", "--profil", default="theatre")
+
     import sys
     sys.stdout.reconfigure(encoding="utf-8")
     a = ap.parse_args(argv)
+    from . import modele as modeles
     from . import profil as profils
     prof = profils.charger(a.profil) if hasattr(a, "profil") else None
+    if prof and getattr(a, "mise_en_page", None):
+        prof = modeles.appliquer(prof, a.mise_en_page)
+
+    if a.etape == "creer-modele":
+        modeles.creer(prof, a.fichier)
+        print(f"Modèle de départ : {a.fichier} — à retoucher dans Word (styles), puis --mise-en-page {a.fichier}")
+        return
+    if a.etape == "importer":
+        from . import importation
+        print("— Import du document")
+        importation.executer(a.fichier, a.sortie, a.modele, a.effort)
 
     if a.etape in ("pretraiter", "tout"):
         from . import pretraitement
@@ -89,15 +111,15 @@ def main(argv: list[str] | None = None) -> None:
         from . import transcription
         print("— Étape 2 : transcription")
         transcription.executer(a.sortie, a.force, a.modele, a.effort, not a.une_image)
-    if a.etape in ("structurer", "tout"):
+    if a.etape in ("structurer", "tout", "importer"):
         from . import structuration
         print("— Étape 3 : structuration")
         structuration.executer(a.sortie, prof, a.force, a.modele, a.effort)
-    if a.etape in ("controler", "tout"):
+    if a.etape in ("controler", "tout", "importer"):
         from . import controles
         print("— Étape 4 : contrôles")
         controles.executer(a.sortie, prof)
-    if a.etape in ("rendre", "tout"):
+    if a.etape in ("rendre", "tout", "importer"):
         from . import rendu as r
         print("— Étape 5 : rendu")
         r.executer(a.sortie, prof, a.nom)

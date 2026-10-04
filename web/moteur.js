@@ -22,14 +22,15 @@ const SDK = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
 const RACINE = new URL("../", import.meta.url);
 const SOURCES = [
   "remise_en_forme/__init__.py", "remise_en_forme/claude.py", "remise_en_forme/controles.py",
-  "remise_en_forme/mise_a_jour.py", "remise_en_forme/pdf.py", "remise_en_forme/pretraitement.py",
+  "remise_en_forme/importation.py", "remise_en_forme/mise_a_jour.py", "remise_en_forme/modele.py",
+  "remise_en_forme/pdf.py", "remise_en_forme/pretraitement.py",
   "remise_en_forme/profil.py",
   "remise_en_forme/reference.py", "remise_en_forme/rendu.py", "remise_en_forme/structuration.py",
   "remise_en_forme/transcription.py", "remise_en_forme/web.py",
 ];
 // Bibliothèques Python fournies avec le site (pur Python)
 const ROUES = ["defusedxml-0.7.1-py2.py3-none-any.whl", "python_docx-1.2.0-py3-none-any.whl",
-               "fpdf2-2.8.9-py3-none-any.whl"];
+               "fpdf2-2.8.9-py3-none-any.whl", "pypdf-6.19.0-py3-none-any.whl"];
 const POLICES = ["EBGaramond-Regular.ttf", "EBGaramond-Bold.ttf", "EBGaramond-Italic.ttf", "EBGaramond-BoldItalic.ttf"];
 const PARALLELES = 4;
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -210,13 +211,49 @@ async function parLot(etape, requetes, recues, libelle) {
 }
 
 // ---------------------------------------------------------------------------
-// Les deux parcours
+// Les parcours
 // ---------------------------------------------------------------------------
 
-async function nouveau(t) {
-  const { photos, nom, modele, profil } = t.entrees;
-  web.definir_profil(profil);
+async function preparerProjet(entrees) {
+  web.definir_profil(entrees.profil);
   viderDossier("/travail");
+  py.FS.mkdirTree("/travail");
+  if (entrees.miseEnPage?.blob) {
+    py.FS.writeFile("/travail/modele.docx", new Uint8Array(await entrees.miseEnPage.blob.arrayBuffer()));
+    web.definir_modele("/travail/modele.docx");
+    log(`Modèle de mise en page : ${entrees.miseEnPage.nom}`);
+  } else {
+    web.definir_modele("");
+  }
+}
+
+async function finirDocument(S, nom) {
+  rep = await appeler("S", web.preparer_structuration(S, contexte.travail.entrees.modele), "Mise en forme (étiquetage)");
+  web.terminer_structuration(S, rep);
+  envoyer({ type: "etape", texte: "Contrôles et document Word…", fait: 0, total: 1 });
+  const f = JSON.parse(web.controler_et_rendre(S, nom));
+  return [lire(f.pdf, `${nom}.pdf`, "application/pdf"), lire(f.docx, `${nom}.docx`, DOCX),
+          lire(f.a_annoter, `${nom}_a_annoter.docx`, DOCX), lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
+}
+let rep = null;
+
+async function importer(t) {
+  const { fichier, nom, modele } = t.entrees;
+  await preparerProjet(t.entrees);
+  const chemin = `/travail/import/${fichier.nom.replace(/[^\w.-]+/g, "_")}`;
+  py.FS.mkdirTree("/travail/import");
+  py.FS.writeFile(chemin, new Uint8Array(await fichier.blob.arrayBuffer()));
+  const S = "/travail/sortie";
+  envoyer({ type: "etape", texte: `Lecture de ${fichier.nom}…`, fait: 0, total: 1 });
+  rep = await appeler("I", web.importer_preparer(chemin, S, modele), "Transcription des pages scannées", true);
+  const r = JSON.parse(web.importer_terminer(S, rep));
+  log(`${fichier.nom} : ${r.pages} page(s)`);
+  return finirDocument(S, nom);
+}
+
+async function nouveau(t) {
+  const { photos, nom, modele } = t.entrees;
+  await preparerProjet(t.entrees);
   await deposer("/travail/photos", photos);
   const S = "/travail/sortie";
 
@@ -225,22 +262,14 @@ async function nouveau(t) {
   log(`${p.photos} photo(s) → ${p.pages} page(s)`);
   if (p.incertaines.length) log(`⚠ orientation incertaine : ${p.incertaines.join(", ")}`);
 
-  let rep = await appeler("T", web.preparer_transcription(S, modele), "Transcription des pages", true);
+  rep = await appeler("T", web.preparer_transcription(S, modele), "Transcription des pages", true);
   web.terminer_transcription(S, rep);
-  rep = await appeler("S", web.preparer_structuration(S, modele), "Mise en forme (étiquetage)");
-  web.terminer_structuration(S, rep);
-
-  envoyer({ type: "etape", texte: "Contrôles et document Word…", fait: 0, total: 1 });
-  const f = JSON.parse(web.controler_et_rendre(S, nom));
-  return [lire(f.pdf, `${nom}.pdf`, "application/pdf"), lire(f.docx, `${nom}.docx`, DOCX),
-          lire(f.a_annoter, `${nom}_a_annoter.docx`, DOCX), lire(f.rapport, `${nom}_rapport.md`, "text/markdown")];
+  return finirDocument(S, nom);
 }
 
 async function maj(t) {
-  const { reference, personnes, nom, modele, profil } = t.entrees;
-  web.definir_profil(profil);
-  viderDossier("/travail");
-  py.FS.mkdirTree("/travail");
+  const { reference, personnes, nom, modele } = t.entrees;
+  await preparerProjet(t.entrees);
   py.FS.writeFile("/travail/reference.docx", new Uint8Array(await reference.blob.arrayBuffer()));
   const r = JSON.parse(web.maj_commencer("/travail/reference.docx", reference.nom));
   log(`Référence : ${reference.nom} — ${r.elements} éléments`);
@@ -281,7 +310,8 @@ async function lancer({ id, cle, adresseApi, relais }) {
   travail.etat = "en_cours";
   await travaux.ecrire(travail);
   try {
-    const fichiers = travail.type === "maj" ? await maj(travail) : await nouveau(travail);
+    const parcours = { maj, nouveau, import: importer }[travail.type];
+    const fichiers = await parcours(travail);
     envoyer({ type: "fini", id, cout: web.cout_total(), fichiers });
   } catch (e) {
     if (!(e instanceof EnAttente)) throw e;
@@ -296,6 +326,12 @@ self.onmessage = async ({ data }) => {
   try {
     if (data.type === "init") await init();
     else if (data.type === "lancer") await lancer(data);
+    else if (data.type === "creer-modele") {
+      web.definir_profil(data.profil);
+      py.FS.mkdirTree("/travail");
+      web.creer_modele("/travail/modele_depart.docx");
+      envoyer({ type: "modele", id: data.id, fichier: lire("/travail/modele_depart.docx", data.nom, DOCX) });
+    }
   } catch (e) {
     log(`[détail de l'erreur] ${e?.stack || e}`); // visible dans « Détails »
     let texte = String(e?.message || e);

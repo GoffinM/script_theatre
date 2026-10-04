@@ -1,7 +1,7 @@
 // Interface de l'application web. Le travail lourd (Python, appels à Claude) se fait
-// dans le Web Worker web/moteur.js ; ici : réglages, photos, suivi, résultats, archives.
+// dans le Web Worker web/moteur.js ; ici : réglages, projets, photos, suivi, résultats, archives.
 
-import { archives, brouillons, travaux } from "./stockage.js";
+import { archives, brouillons, projets, travaux } from "./stockage.js";
 import { DATE_VERSION, EDITEUR, VERSION } from "./version.js";
 
 const $ = (s) => document.querySelector(s);
@@ -18,16 +18,6 @@ const stock = {
   effacer(k) { try { localStorage.removeItem(k); } catch { /* idem */ } },
 };
 
-async function profilOrigine(nom) {
-  const rep = await fetch(`profils/${nom}.yaml`);
-  return rep.text();
-}
-
-async function afficherProfil() {
-  const nom = $("#profil").value;
-  $("#profil-texte").value = stock.lire(`profil:${nom}`) || await profilOrigine(nom);
-}
-
 function majEtatCle() {
   const ok = Boolean(stock.lire("cle"));
   $("#etat-cle").textContent = ok ? "✓ clé enregistrée" : "clé à saisir";
@@ -41,20 +31,16 @@ $("#copyright").textContent = `© ${DATE_VERSION.slice(0, 4)} ${EDITEUR} — Tou
 
 $("#cle").value = stock.lire("cle");
 $("#modele").value = stock.lire("modele", "claude-opus-5-5");
-$("#profil").value = stock.lire("profil", "theatre");
 $("#mode").value = stock.lire("mode", "rapide");
 $("#relais").value = stock.lire("relais");
 const majChampRelais = () => ($("#bloc-relais").hidden = $("#mode").value !== "lot");
 majChampRelais();
 $("#mode").addEventListener("change", majChampRelais);
-afficherProfil();
 majEtatCle();
 
-$("#profil").addEventListener("change", afficherProfil);
 $("#enregistrer").addEventListener("click", () => {
   stock.ecrire("cle", $("#cle").value.trim());
   stock.ecrire("modele", $("#modele").value);
-  stock.ecrire("profil", $("#profil").value);
   if ($("#mode").value === "lot" && !$("#relais").value.trim()) {
     alert("Le mode « en arrière-plan » demande l'adresse du relais (voir l'aide sous le champ).");
     return;
@@ -64,14 +50,146 @@ $("#enregistrer").addEventListener("click", () => {
   majEtatCle();
   $("#reglages").open = false;
 });
-$("#profil-enregistrer").addEventListener("click", () => {
-  stock.ecrire(`profil:${$("#profil").value}`, $("#profil-texte").value);
-  $("#profil-enregistrer").textContent = "Profil enregistré ✓";
-  setTimeout(() => ($("#profil-enregistrer").textContent = "Enregistrer le profil"), 1500);
+
+// ---------------------------------------------------------------------------
+// Projets : profil (dont les personnages) et modèle de mise en page communs à
+// tous les documents du projet
+// ---------------------------------------------------------------------------
+
+let projet = null; // projet courant
+
+async function profilOrigine(base) {
+  const rep = await fetch(`profils/${base}.yaml`);
+  return rep.text();
+}
+
+async function creerProjet(nom, base = "theatre", profil = null) {
+  const p = { id: `p${Date.now()}`, nom, base, profil: profil ?? await profilOrigine(base), miseEnPage: null, date: Date.now() };
+  await projets.ecrire(p);
+  return p;
+}
+
+async function chargerProjets() {
+  let liste = await projets.tous();
+  if (!liste.length) {
+    // premier lancement de cette version : un projet reprend les réglages et documents existants
+    const base = stock.lire("profil", "theatre");
+    const p = await creerProjet("Mon projet", base, stock.lire(`profil:${base}`) || null);
+    for (const a of await archives.toutes()) if (!a.projet) await archives.ajouter({ ...a, projet: p.id });
+    liste = [p];
+  }
+  const voulu = stock.lire("projet");
+  projet = liste.find((p) => p.id === voulu) || liste[0];
+  stock.ecrire("projet", projet.id);
+  $("#projet").replaceChildren(...liste.map((p) => new Option(p.nom, p.id, false, p.id === projet.id)));
+  afficherProjet();
+}
+
+function afficherProjet() {
+  $("#projet-nom").value = projet.nom;
+  $("#projet-base").value = projet.base;
+  $("#profil-texte").value = projet.profil;
+  const m = projet.miseEnPage;
+  $("#etat-modele").textContent = m ? `Modèle utilisé : ${m.nom}` : "Aucun modèle : mise en page par défaut du profil.";
+  $("#modele-retirer").hidden = !m;
+  $("#resume-projet").textContent = `— ${projet.base === "roman" ? "roman" : "théâtre"}${m ? ", modèle " + m.nom : ""}`;
+  $("#titre-documents").textContent = `— ${projet.nom}`;
+}
+
+async function enregistrerProjet() {
+  projet.nom = $("#projet-nom").value.trim() || projet.nom;
+  projet.profil = $("#profil-texte").value;
+  await projets.ecrire(projet);
+  const opt = [...$("#projet").options].find((o) => o.value === projet.id);
+  if (opt) opt.textContent = projet.nom;
+  afficherProjet();
+}
+
+$("#projet").addEventListener("change", async () => {
+  stock.ecrire("projet", $("#projet").value);
+  await chargerProjets();
+  if (!$("#onglet-documents").hidden) afficherArchives();
+});
+$("#nouveau-projet").addEventListener("click", async () => {
+  const nom = prompt("Nom du nouveau projet (par exemple « Projet théâtre XXX ») :");
+  if (!nom?.trim()) return;
+  const base = confirm("Texte de théâtre ? (Annuler = roman)") ? "theatre" : "roman";
+  const p = await creerProjet(nom.trim(), base);
+  stock.ecrire("projet", p.id);
+  await chargerProjets();
+  $("#details-projet").open = true;
+  if (!$("#onglet-documents").hidden) afficherArchives();
+});
+$("#projet-base").addEventListener("change", async () => {
+  const base = $("#projet-base").value;
+  if (!confirm(`Passer ce projet en « ${base === "roman" ? "roman" : "théâtre"} » ? Son profil sera remplacé par le profil d'origine correspondant.`)) {
+    $("#projet-base").value = projet.base;
+    return;
+  }
+  projet.base = base;
+  $("#profil-texte").value = await profilOrigine(base);
+  await enregistrerProjet();
 });
 $("#profil-defaut").addEventListener("click", async () => {
-  stock.effacer(`profil:${$("#profil").value}`);
-  await afficherProfil();
+  if (!confirm("Remplacer le profil de ce projet par le profil d'origine ?")) return;
+  $("#profil-texte").value = await profilOrigine(projet.base);
+  await enregistrerProjet();
+});
+$("#profil-texte").addEventListener("change", enregistrerProjet);
+$("#projet-nom").addEventListener("change", enregistrerProjet);
+$("#projet-enregistrer").addEventListener("click", async () => {
+  await enregistrerProjet();
+  $("#projet-enregistrer").textContent = "Projet enregistré ✓";
+  setTimeout(() => ($("#projet-enregistrer").textContent = "Enregistrer le projet"), 1500);
+});
+$("#projet-supprimer").addEventListener("click", async () => {
+  const docs = (await archives.toutes()).filter((a) => a.projet === projet.id);
+  if (!confirm(`Supprimer le projet « ${projet.nom} »${docs.length ? ` et ses ${docs.length} document(s)` : ""} de cet appareil ?`)) return;
+  for (const a of docs) await archives.supprimer(a.id);
+  await projets.supprimer(projet.id);
+  stock.effacer("projet");
+  await chargerProjets();
+  if (!$("#onglet-documents").hidden) afficherArchives();
+});
+
+// Modèle de mise en page
+$("#modele-deposer").addEventListener("click", () => $("#modele-fichier").click());
+$("#modele-fichier").addEventListener("change", async () => {
+  const f = $("#modele-fichier").files[0];
+  $("#modele-fichier").value = "";
+  if (!f) return;
+  if (!f.name.toLowerCase().endsWith(".docx")) return alert("Le modèle doit être un fichier .docx.");
+  projet.miseEnPage = { nom: f.name, blob: new Blob([await f.arrayBuffer()], { type: DOCX }) };
+  await projets.ecrire(projet);
+  afficherProjet();
+});
+$("#modele-retirer").addEventListener("click", async () => {
+  if (!confirm("Retirer le modèle de mise en page de ce projet ?")) return;
+  projet.miseEnPage = null;
+  await projets.ecrire(projet);
+  afficherProjet();
+});
+$("#modele-depart").addEventListener("click", async () => {
+  if (enCours) return alert("Un traitement est en cours : réessayez quand il sera terminé.");
+  const b = $("#modele-depart");
+  b.disabled = true;
+  b.textContent = "Préparation du modèle (premier usage : chargement ~40 Mo)…";
+  try {
+    await demarrerMoteur();
+    const id = `modele${Date.now()}`;
+    const fin = new Promise((ok) => enAttenteDe.set(id, ok));
+    moteur.postMessage({ type: "creer-modele", id, profil: $("#profil-texte").value,
+                         nom: `modele_${projet.nom.replace(/[^\p{L}\p{N}_-]+/gu, "_")}.docx` });
+    const m = await fin;
+    enAttenteDe.delete(id);
+    if (m.type === "erreur") throw new Error(m.texte);
+    telecharger({ nom: m.fichier.nom, blob: new Blob([m.fichier.octets], { type: DOCX }) });
+  } catch (e) {
+    alert("Modèle impossible à créer : " + e.message);
+  } finally {
+    b.disabled = false;
+    b.textContent = "Télécharger le modèle de départ";
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -81,6 +199,7 @@ $("#profil-defaut").addEventListener("click", async () => {
 function ouvrirOnglet(nom) {
   document.querySelectorAll("[data-onglet]").forEach((x) => x.setAttribute("aria-selected", x.dataset.onglet === nom));
   for (const o of ["nouveau", "maj", "documents"]) $(`#onglet-${o}`).hidden = o !== nom;
+  $("#carte-import").hidden = nom !== "nouveau";
   if (nom === "documents") afficherArchives();
 }
 document.querySelectorAll("[data-onglet]").forEach((b) => b.addEventListener("click", () => ouvrirOnglet(b.dataset.onglet)));
@@ -263,7 +382,7 @@ function recevoir(m) {
   } else if (m.type === "etape") {
     $("#etape").textContent = m.total > 1 ? `${m.texte} (${m.fait}/${m.total})` : m.texte;
     $("#barre").style.width = `${m.total ? (100 * m.fait) / m.total : 0}%`;
-  } else if (["fini", "attente", "erreur"].includes(m.type)) {
+  } else if (["fini", "attente", "erreur", "modele"].includes(m.type)) {
     enAttenteDe.get(m.id)?.(m);
   }
 }
@@ -291,7 +410,8 @@ function reglagesValides() {
     return null;
   }
   return {
-    cle, modele: stock.lire("modele", "claude-opus-5-5"), profil: $("#profil-texte").value,
+    cle, modele: stock.lire("modele", "claude-opus-5-5"), profil: projet.profil, miseEnPage: projet.miseEnPage,
+    projet: projet.id,
     mode: stock.lire("mode", "rapide"), relais: stock.lire("relais") || null,
     adresseApi: stock.lire("adresseApi") || null, // réservé aux tests en local (relais de développement)
   };
@@ -351,9 +471,10 @@ async function executer(id) {
       + "enregistré dans « Mes documents »";
     $("#barre").style.width = "100%";
     const fichiers = m.fichiers.map((f) => ({ nom: f.nom, type: f.type, blob: new Blob([f.octets], { type: f.type }) }));
-    await archives.ajouter({ id, date: Date.now(), type: travail.type, nom: travail.nom, cout: m.cout, fichiers });
+    await archives.ajouter({ id, date: Date.now(), type: travail.type, nom: travail.nom, cout: m.cout, fichiers,
+                             projet: travail.entrees.projet });
     await travaux.supprimer(id);
-    afficherResultats(fichiers, $("#resultat"), travail.type === "nouveau");
+    afficherResultats(fichiers, $("#resultat"), travail.type !== "maj");
   } catch (e) {
     afficherMessage("Erreur : " + e.message, "erreur", boutonFichier("Réessayer", "", () => executer(id)));
   } finally {
@@ -395,7 +516,7 @@ async function reprendreTravaux() {
 async function creerTravail(type, nom, entrees, r) {
   const travail = {
     id: `${Date.now()}`, date: Date.now(), type, nom, mode: r.mode, etat: "en_cours",
-    entrees: { ...entrees, nom, modele: r.modele, profil: r.profil },
+    entrees: { ...entrees, nom, modele: r.modele, profil: r.profil, miseEnPage: r.miseEnPage, projet: r.projet },
   };
   await travaux.ecrire(travail);
   return travail.id;
@@ -434,6 +555,27 @@ $("#lancer-maj").addEventListener("click", async () => {
   executer(id);
 });
 
+// Import d'un document déjà propre (PDF, DOCX, TXT)
+$("#fichier-import").addEventListener("change", () => {
+  const f = $("#fichier-import").files[0];
+  if (f && !$("#nom-import").value.trim()) $("#nom-import").value = f.name.replace(/\.[^.]+$/, "");
+});
+$("#lancer-import").addEventListener("click", async () => {
+  const r = reglagesValides();
+  if (!r) return;
+  const f = $("#fichier-import").files[0];
+  if (!f) return alert("Choisissez un document (PDF, DOCX ou TXT).");
+  if (/\.doc$/i.test(f.name)) return alert("Format .doc (Word 97-2003) : dans Word, « Enregistrer sous » DOCX ou PDF, puis importez ce fichier.");
+  if (!/\.(pdf|docx|txt)$/i.test(f.name)) return alert("Formats acceptés : PDF, DOCX ou TXT.");
+  const nom = $("#nom-import").value.trim() || f.name.replace(/\.[^.]+$/, "");
+  const fichier = { nom: f.name, blob: new Blob([await f.arrayBuffer()], { type: f.type || "application/octet-stream" }) };
+  const id = await creerTravail("import", nom, { fichier }, r);
+  $("#fichier-import").value = "";
+  $("#nom-import").value = "";
+  executer(id);
+});
+
+await chargerProjets();
 reprendreTravaux();
 
 // ---------------------------------------------------------------------------
@@ -539,7 +681,7 @@ function markdownSimple(md) {
 const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 
 async function afficherArchives() {
-  const liste = await archives.toutes();
+  const liste = (await archives.toutes()).filter((a) => a.projet === projet?.id);
   const zone = $("#archives");
   if (!liste.length) {
     zone.innerHTML = `<p class="aide">Aucun document pour l'instant. Chaque résultat sera enregistré ici automatiquement.</p>`;
@@ -554,10 +696,10 @@ async function afficherArchives() {
     titre.textContent = a.nom;
     const info = document.createElement("span");
     info.className = "aide";
-    info.textContent = `${a.type === "maj" ? "Mise à jour" : "Transcription"} — ${FORMAT_DATE.format(a.date)} — ${a.cout.toFixed(2)} $`;
+    info.textContent = `${{ maj: "Mise à jour", import: "Import" }[a.type] || "Transcription"} — ${FORMAT_DATE.format(a.date)} — ${a.cout.toFixed(2)} $`;
     tete.append(titre, info);
     const fichiers = document.createElement("div");
-    afficherResultats(a.fichiers, fichiers, a.type === "nouveau");
+    afficherResultats(a.fichiers, fichiers, a.type !== "maj");
     const actions = document.createElement("div");
     actions.className = "rangee";
     actions.append(boutonFichier("Supprimer", "second", async () => {

@@ -13,7 +13,9 @@ C'est une page statique, publiable telle quelle sur GitHub Pages. Le code Python
 - **Premier lancement :** environ 40 Mo sont téléchargés (Python, OpenCV), puis gardés en cache.
 - **Clé d'API :** chacun saisit sa clé dans « Réglages », et elle reste enregistrée sur son appareil. Conseil : créez sur console.anthropic.com une clé par personne, avec un plafond de dépense.
 - **Photos :** « 📷 Prendre une photo » ouvre l'appareil photo, une page après l'autre ; on peut aussi ajouter des photos depuis la galerie. Les photos sont enregistrées sur l'appareil dès qu'elles sont prises : elles ne se perdent pas si le navigateur recharge la page. ◀ change l'ordre, ✕ retire une photo.
-- **Onglet « Nouveau document » :** photos → DOCX, DOCX à annoter (numéroté) et rapport.
+- **Projets :** un projet (par exemple « Projet théâtre XXX ») regroupe le profil (dont la liste des personnages) et le modèle de mise en page. Tous les documents du projet ont donc le même format. « Mes documents » montre les documents du projet choisi.
+- **Modèle de mise en page :** dans les réglages du projet, « Télécharger le modèle de départ » fournit un DOCX avec un exemple de chaque élément. On modifie ses **styles** dans Word (Accueil › Styles › clic droit › Modifier) sans les renommer, on l'enregistre, puis « Déposer un modèle ». Le DOCX et le PDF du projet suivent alors ces styles ; le PDF garde sa police Garamond embarquée.
+- **Onglet « Nouveau document » :** photos → DOCX, DOCX à annoter (numéroté) et rapport. On peut aussi y **importer un document déjà propre** (PDF, DOCX ou TXT), qui est remis au format du projet. Le texte d'un DOCX ou d'un PDF exporté est lu directement, donc seul l'étiquetage est facturé. Les pages scannées d'un PDF sont transcrites. Les fichiers .doc (Word 97-2003) sont à enregistrer d'abord en DOCX ou PDF.
 - **Onglet « Mes documents » :** chaque résultat y est enregistré automatiquement, sur l'appareil uniquement. On peut le retélécharger, le partager, le supprimer, ou utiliser un document transcrit comme référence d'une mise à jour.
 - **Onglet « Mise à jour » :** DOCX de référence + photos annotées par personne → DOCX en suivi des modifications et rapport.
 - **Interruption :** chaque réponse de Claude est enregistrée dès réception. Un traitement interrompu (page quittée, téléphone en veille) reprend tout seul à la réouverture, sans repayer ce qui est déjà fait. L'écran reste allumé pendant le traitement.
@@ -66,6 +68,16 @@ Options utiles :
 - `-p mon_profil` : utilise `profils\mon_profil.yaml`.
 
 Pour corriger une erreur de transcription à la main : modifier le `.json` de la page dans `sortie\02_transcription\`, puis relancer `structurer --force`, `controler` et `rendre`.
+
+## Importer un document déjà propre, modèle de mise en page (ligne de commande)
+
+```
+.venv\Scripts\python -m remise_en_forme importer texte_propre.docx -p theatre --nom ma_piece -o sortie_import
+.venv\Scripts\python -m remise_en_forme creer-modele mon_modele.docx -p theatre
+.venv\Scripts\python -m remise_en_forme importer texte.pdf -p theatre --nom ma_piece --mise-en-page mon_modele.docx
+```
+
+`importer` accepte les formats PDF, DOCX et TXT. `--mise-en-page` (le DOCX dont on a retouché les styles dans Word) fonctionne aussi avec `rendre`, `tout` et `mettre-a-jour`.
 
 ## Mise à jour hebdomadaire à partir de pages annotées
 

@@ -69,13 +69,17 @@ def longueur_pleine(texte: str) -> float:
     return float(longs[int(0.9 * (len(longs) - 1))]) if longs else 0.0
 
 
-def aplatir(texte: str, ou: str, rap: Rapport, pleine: float = 0.0, seuil: float = 0.8) -> str:
+def aplatir(texte: str, ou: str, rap: Rapport, pleine: float = 0.0, seuil: float = 0.8,
+            par_ligne: bool = False) -> str:
     """Joint les lignes d'un élément, césures recollées.
 
     Si `pleine` est donné (option de profil `paragraphes: lignes_courtes`),
     une ligne courte terminée par une ponctuation finale clôt un paragraphe :
     le suivant est séparé par un retour à la ligne.
+    `par_ligne` (document importé, DOCX ou TXT) : chaque ligne est déjà un paragraphe.
     """
+    if par_ligne:
+        return "\n".join(l.strip() for l in texte.split("\n") if l.strip())
     paragraphes, prec = [""], ""
     for l in texte.split("\n"):
         if not l.strip():
@@ -196,6 +200,7 @@ def assembler(trans: list[dict], struct: list[dict], prof: dict, rap: Rapport) -
         page = t["numero_page"] or f"[{Path(t['image']).stem[:3]}]"
         ou = f"p. {page}"
         pleine = longueur_pleine(t["texte"]) if par_courtes else 0.0
+        par_ligne = bool(t.get("par_ligne"))
         controle_fidelite(t, s, ou, rap)
         for a in s.get("anomalies", []):
             rap.ajout("Fidélité (texte modifié à l'étiquetage)", f"{ou} : {a}")
@@ -209,7 +214,7 @@ def assembler(trans: list[dict], struct: list[dict], prof: dict, rap: Rapport) -
                 rap.ajout("Éléments coupés entre pages",
                           f"{_nom(prec)} raccordé(e) "
                           f"p. {prec['pages'][-1]} → p. {page}")
-                prec["texte"] = joindre(prec["texte"], aplatir(e["texte"], ou, rap, pleine, seuil),
+                prec["texte"] = joindre(prec["texte"], aplatir(e["texte"], ou, rap, pleine, seuil, par_ligne),
                                         f"p. {prec['pages'][-1]}→{page}", rap)
                 prec["texte_brut"] += "\n" + e["texte"]
                 prec["pages"].append(page)
@@ -220,7 +225,8 @@ def assembler(trans: list[dict], struct: list[dict], prof: dict, rap: Rapport) -
                           f"{ou} : le haut de page ({e['type']}) semble continuer la page précédente, "
                           f"mais celle-ci finit par un autre type ({avant}) : gardé séparé")
             doc.append({"type": e["type"], "personnage": e.get("personnage"),
-                        "texte": aplatir(e["texte"], ou, rap, pleine if e["type"] in avec_suite else 0.0, seuil),
+                        "texte": aplatir(e["texte"], ou, rap, pleine if e["type"] in avec_suite else 0.0, seuil,
+                                         par_ligne),
                         "texte_brut": e["texte"],
                         "pages": [page]})
         # fin de page : réplique interrompue sans suite à la page suivante ?

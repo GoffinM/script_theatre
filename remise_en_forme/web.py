@@ -26,11 +26,12 @@ if not hasattr(sys.stdout, "reconfigure"):  # sortie de Pyodide : pas de reconfi
 
     sys.stdout = _Sortie(sys.stdout)
 
-from . import (claude, controles, mise_a_jour, pretraitement, profil, reference, rendu,
-               structuration, transcription)
+from . import (claude, controles, importation, mise_a_jour, modele, pretraitement, profil, reference,
+               rendu, structuration, transcription)
 
 _EN_ATTENTE: dict[str, dict] = {}   # cle → requête, en attente de sa réponse
 _PROFIL: dict | None = None
+_MODELE: str = ""                    # modèle de mise en page du projet (DOCX de styles), ou ""
 _MAJ: dict = {}                      # état d'une mise à jour en cours
 
 
@@ -58,6 +59,24 @@ def definir_profil(yaml_texte: str) -> str:
     _PROFIL = profil.charger_texte(yaml_texte, nom="profil")
     claude.JOURNAL.clear()
     return _PROFIL.get("nom", "profil")
+
+
+def definir_modele(chemin: str) -> str:
+    """Modèle de mise en page du projet ("" : aucun) ; renvoie les styles qu'il définit."""
+    global _MODELE
+    _MODELE = chemin
+    return json.dumps(sorted(_rendu_profil().get("mise_en_page", {}).get("styles", {})) if chemin else [])
+
+
+def _rendu_profil() -> dict:
+    """Profil pour le rendu : avec les styles du modèle de mise en page s'il y en a un."""
+    return modele.appliquer(_PROFIL, _MODELE or None)
+
+
+def creer_modele(chemin: str) -> str:
+    """Modèle de départ (DOCX) pour le profil courant, à retoucher dans Word."""
+    modele.creer(_PROFIL, Path(chemin))
+    return chemin
 
 
 def cout_total() -> float:
@@ -96,11 +115,25 @@ def controler_et_rendre(sortie: str, nom: str) -> str:
     """Étapes 4 et 5 ; retourne les chemins des fichiers produits."""
     s = Path(sortie)
     controles.executer(s, _PROFIL)
-    rendu.executer(s, _PROFIL, nom)
+    rendu.executer(s, _rendu_profil(), nom)
     return json.dumps({"docx": str(s / "05_rendu" / f"{nom}.docx"),
                        "pdf": str(s / "05_rendu" / f"{nom}.pdf"),
                        "a_annoter": str(s / "05_rendu" / f"{nom}_a_annoter.docx"),
                        "rapport": str(s / "04_controles" / "rapport.md")})
+
+
+# --------------------------------------------------------------------------
+# Import d'un document déjà propre (TXT, DOCX, PDF)
+# --------------------------------------------------------------------------
+
+def importer_preparer(fichier: str, sortie: str, modele_claude: str, effort: str = "low") -> str:
+    """Lit le document ; requêtes seulement pour les pages de PDF scannées (souvent aucune)."""
+    return _vers_js(importation.preparer(Path(fichier), Path(sortie), modele_claude, effort))
+
+
+def importer_terminer(sortie: str, reponses_json: str) -> str:
+    pages = importation.terminer(Path(sortie), _depuis_js(reponses_json))
+    return json.dumps({"pages": len(pages)})
 
 
 # --------------------------------------------------------------------------
@@ -140,6 +173,6 @@ def maj_terminer_auteur(auteur: str, travail: str, reponses_json: str) -> str:
 
 def maj_finaliser(sortie: str, nom: str) -> str:
     cible = mise_a_jour.finaliser(_MAJ["nom_reference"], _MAJ["elements"], _MAJ["lectures"],
-                                  _PROFIL, Path(sortie), nom)
+                                  _rendu_profil(), Path(sortie), nom)
     return json.dumps({"docx": str(cible), "pdf": str(cible.with_suffix(".pdf")),
                        "rapport": str(Path(sortie) / "rapport_maj.md")})
