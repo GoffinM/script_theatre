@@ -116,13 +116,16 @@ def maj_commencer(reference_docx: str, nom_reference: str = "") -> str:
 
 
 def maj_preparer_transcription(photos: str, travail: str, modele: str, effort: str = "low") -> str:
+    """Prétraitement des photos d'une personne + requêtes de transcription du texte imprimé.
+    Les clés sont préfixées par `travail|` : les requêtes de plusieurs personnes peuvent
+    partir ensemble sans se confondre."""
     pretraitement.executer(Path(photos), Path(travail))
-    return preparer_transcription(travail, modele, effort)
+    return _vers_js(transcription.preparer(Path(travail), True, modele, effort), prefixe=travail + "|")
 
 
 def maj_preparer_annotations(travail: str, reponses_transcription_json: str, modele: str,
                              effort: str = "low") -> str:
-    transcription.terminer(Path(travail), _depuis_js(reponses_transcription_json))
+    transcription.terminer(Path(travail), _depuis_js(reponses_transcription_json, prefixe=travail + "|"))
     return _vers_js(mise_a_jour.preparer_annotations(Path(travail), _MAJ["elements"], _PROFIL,
                                                      modele, effort, force=True), prefixe=travail + "|")
 

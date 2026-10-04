@@ -113,6 +113,21 @@
       <option value="claude-opus-5-5">Opus 5.5 — le plus fiable (≈ 3 centimes / page)</option>
       <option value="claude-sonnet-5-5">Sonnet 5.5 — moins cher, quelques erreurs mesurées</option>
     </select>
+    <label for="mode">Exécution</label>
+    <select id="mode">
+      <option value="rapide">Rapide — garder l'application ouverte (1 à 2 min)</option>
+      <option value="lot">En arrière-plan — on peut fermer l'application, 2× moins cher</option>
+    </select>
+    <p class="aide">Dans les deux cas, un traitement interrompu reprend tout seul à la réouverture,
+      sans repayer ce qui est déjà fait. En arrière-plan, Anthropic traite les pages de son côté
+      (en général quelques minutes) ; en revenant dans l'application, elle termine le document.</p>
+    <div id="bloc-relais" hidden>
+      <label for="relais">Adresse du relais (mode arrière-plan)</label>
+      <input id="relais" type="text" inputmode="url" placeholder="https://remise-relais.votre-compte.workers.dev">
+      <p class="aide">Anthropic n'accepte pas les traitements en arrière-plan directement depuis un
+        navigateur : ils passent par un petit relais gratuit (Cloudflare, 5 minutes à installer, ne
+        conserve aucune clé). Mode d'emploi : fichier <code>outils/relais-cloudflare.js</code> du dépôt.</p>
+    </div>
     <label for="profil">Profil de mise en forme</label>
     <select id="profil">
       <option value="theatre">Théâtre</option>
@@ -168,7 +183,7 @@
   </section>
 
   <section class="carte" id="suivi" hidden>
-    <h2>Suivi</h2>
+    <h2>Suivi <span class="aide" id="titre-suivi" style="font-weight:400"></span></h2>
     <div class="etat" id="etape">…</div>
     <div class="barre"><div id="barre"></div></div>
     <details><summary style="font-weight:500;font-size:.9rem">Détails</summary><div id="journal"></div></details>

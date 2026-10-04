@@ -86,6 +86,8 @@ def lire_reponse(req: dict, rep: dict) -> dict:
     ecrit, lu = u.get("cache_creation_input_tokens") or 0, u.get("cache_read_input_tokens") or 0
     pe, ps, pc = TARIFS.get(req["modele"], (0.0, 0.0, 0.0))
     cout = (entree * pe + ecrit * pe * 1.25 + lu * pc + sortie * ps) / 1e6
+    if rep.get("_lot"):  # réponse obtenue par l'API Batch : facturée moitié prix
+        cout /= 2
     JOURNAL.append({"etiquette": req["cle"], "modele": rep.get("model"), "effort": req.get("effort"),
                     "jetons_entree": entree, "jetons_cache_ecrits": ecrit, "jetons_cache_lus": lu,
                     "jetons_sortie": sortie, "cout_usd": round(cout, 5)})

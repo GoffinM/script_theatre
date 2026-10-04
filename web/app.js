@@ -1,7 +1,7 @@
 // Interface de l'application web. Le travail lourd (Python, appels à Claude) se fait
 // dans le Web Worker web/moteur.js ; ici : réglages, photos, suivi, résultats, archives.
 
-import { archives, brouillons } from "./stockage.js";
+import { archives, brouillons, travaux } from "./stockage.js";
 
 const $ = (s) => document.querySelector(s);
 const TAILLE_MAX = 2000; // côté le plus long des photos envoyées au moteur (pixels)
@@ -37,6 +37,11 @@ function majEtatCle() {
 $("#cle").value = stock.lire("cle");
 $("#modele").value = stock.lire("modele", "claude-opus-5-5");
 $("#profil").value = stock.lire("profil", "theatre");
+$("#mode").value = stock.lire("mode", "rapide");
+$("#relais").value = stock.lire("relais");
+const majChampRelais = () => ($("#bloc-relais").hidden = $("#mode").value !== "lot");
+majChampRelais();
+$("#mode").addEventListener("change", majChampRelais);
 afficherProfil();
 majEtatCle();
 
@@ -45,6 +50,12 @@ $("#enregistrer").addEventListener("click", () => {
   stock.ecrire("cle", $("#cle").value.trim());
   stock.ecrire("modele", $("#modele").value);
   stock.ecrire("profil", $("#profil").value);
+  if ($("#mode").value === "lot" && !$("#relais").value.trim()) {
+    alert("Le mode « en arrière-plan » demande l'adresse du relais (voir l'aide sous le champ).");
+    return;
+  }
+  stock.ecrire("mode", $("#mode").value);
+  stock.ecrire("relais", $("#relais").value.trim().replace(/\/$/, ""));
   majEtatCle();
   $("#reglages").open = false;
 });
@@ -91,6 +102,7 @@ async function reduirePhoto(fichier) {
 // `surChangement(liste)` est appelé à chaque modification (pour le brouillon).
 function selecteurPhotos(conteneur, surChangement = () => {}) {
   let liste = []; // [{nom, blob, url}]
+  let ajout = Promise.resolve(); // photos en cours de réduction
   conteneur.classList.add("selecteur");
   conteneur.innerHTML = `
     <div class="rangee">
@@ -136,23 +148,26 @@ function selecteurPhotos(conteneur, surChangement = () => {}) {
   for (const role of ["camera", "galerie"]) {
     const entree = conteneur.querySelector(`[data-role=${role}]`);
     conteneur.querySelector(`[data-action=${role}]`).addEventListener("click", () => entree.click());
-    entree.addEventListener("change", async () => {
+    entree.addEventListener("change", () => {
       const nouveaux = [...entree.files];
       entree.value = ""; // permet de reprendre une photo / d'en ajouter d'autres
       compte.textContent = "Ajout…";
-      for (const f of nouveaux) {
-        try {
-          const p = await reduirePhoto(f);
-          liste.push({ ...p, url: URL.createObjectURL(p.blob) });
-        } catch (e) {
-          alert(`Photo illisible (${f.name}) : ${e.message}`);
+      ajout = ajout.then(async () => {
+        for (const f of nouveaux) {
+          try {
+            const p = await reduirePhoto(f);
+            liste.push({ ...p, url: URL.createObjectURL(p.blob) });
+          } catch (e) {
+            alert(`Photo illisible (${f.name}) : ${e.message}`);
+          }
         }
-      }
-      afficher();
+        afficher();
+      });
     });
   }
   return {
     photos: () => liste.map(({ nom, blob }) => ({ nom, blob })),
+    attendre: () => ajout, // à attendre avant de lancer : toutes les photos ajoutées sont prêtes
     restaurer(photos) {
       liste.forEach((p) => URL.revokeObjectURL(p.url));
       liste = (photos || []).map((p) => ({ ...p, url: URL.createObjectURL(p.blob) }));
@@ -218,7 +233,7 @@ function utiliserCommeReference(nom, blob) {
 let moteur = null;
 let moteurPret = null;
 let enCours = false;
-let finTravail = null;
+const enAttenteDe = new Map(); // id du travail → fonction appelée à la fin (fini/attente/erreur)
 
 function demarrerMoteur() {
   if (moteurPret) return moteurPret;
@@ -243,17 +258,24 @@ function recevoir(m) {
   } else if (m.type === "etape") {
     $("#etape").textContent = m.total > 1 ? `${m.texte} (${m.fait}/${m.total})` : m.texte;
     $("#barre").style.width = `${m.total ? (100 * m.fait) / m.total : 0}%`;
-  } else if (m.type === "fini" || m.type === "erreur") {
-    finTravail?.(m);
+  } else if (["fini", "attente", "erreur"].includes(m.type)) {
+    enAttenteDe.get(m.id)?.(m);
   }
 }
 
-function afficherSuivi() {
-  $("#suivi").hidden = false;
-  $("#resultat").replaceChildren();
-  $("#journal").textContent = "";
-  $("#suivi").scrollIntoView({ behavior: "smooth", block: "start" });
+// Écran maintenu allumé pendant un traitement (sinon le téléphone met la page en pause)
+let verrouEcran = null;
+async function garderEcranAllume(oui) {
+  try {
+    if (oui && !verrouEcran) verrouEcran = await navigator.wakeLock?.request("screen");
+    if (!oui && verrouEcran) { await verrouEcran.release(); verrouEcran = null; }
+  } catch { verrouEcran = null; }
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") { verrouEcran = null; return; } // relâché par le système
+  if (enCours) garderEcranAllume(true);
+  else reprendreTravaux(); // retour dans l'application : un lot est peut-être terminé
+});
 
 function reglagesValides() {
   const cle = stock.lire("cle");
@@ -263,62 +285,136 @@ function reglagesValides() {
     alert("Saisissez d'abord votre clé d'API dans les réglages.");
     return null;
   }
-  // adresseApi : réservé aux tests en local (relais de développement), vide sinon
-  return { cle, modele: stock.lire("modele", "claude-opus-5-5"), profil: $("#profil-texte").value,
-           adresseApi: stock.lire("adresseApi") || null };
+  return {
+    cle, modele: stock.lire("modele", "claude-opus-5-5"), profil: $("#profil-texte").value,
+    mode: stock.lire("mode", "rapide"), relais: stock.lire("relais") || null,
+    adresseApi: stock.lire("adresseApi") || null, // réservé aux tests en local (relais de développement)
+  };
 }
 
-async function lancer(type, nom, message, apresSucces) {
+function afficherMessage(texte, classe, ...boutons) {
+  const p = document.createElement("p");
+  p.className = classe;
+  p.textContent = texte;
+  const r = document.createElement("div");
+  r.className = "rangee";
+  r.append(...boutons);
+  $("#resultat").replaceChildren(p, r);
+}
+
+// Exécute (ou reprend) un travail enregistré dans IndexedDB.
+async function executer(id) {
   if (enCours) return;
+  const travail = await travaux.lire(id);
+  if (!travail) return;
+  const r = reglagesValides();
+  if (!r) return;
   enCours = true;
   document.querySelectorAll("#lancer-nouveau, #lancer-maj").forEach((b) => (b.disabled = true));
-  afficherSuivi();
+  $("#suivi").hidden = false;
+  $("#resultat").replaceChildren();
+  $("#journal").textContent = "";
+  $("#titre-suivi").textContent = travail.nom;
+  $("#suivi").scrollIntoView({ behavior: "smooth", block: "start" });
+  await garderEcranAllume(true);
   try {
     $("#etape").textContent = "Démarrage du moteur (premier lancement : ~40 Mo)…";
     await demarrerMoteur();
-    const fin = new Promise((ok) => (finTravail = ok));
-    moteur.postMessage(await message());
+    const fin = new Promise((ok) => enAttenteDe.set(id, ok));
+    moteur.postMessage({ type: "lancer", id, cle: r.cle, relais: r.relais, adresseApi: r.adresseApi });
     const m = await fin;
-    if (m.type === "erreur") throw new Error(m.texte);
+    if (m.type === "erreur") {
+      travail.etat = "erreur";
+      travail.message = m.texte;
+      await travaux.ecrire(travail);
+      $("#etape").textContent = "";
+      afficherMessage("Erreur : " + m.texte, "erreur",
+        boutonFichier("Reprendre", "", () => executer(id)),
+        boutonFichier("Abandonner", "second", () => abandonner(id)));
+      return;
+    }
+    if (m.type === "attente") {
+      $("#etape").textContent = m.texte;
+      $("#barre").style.width = "50%";
+      afficherMessage("Confié à Anthropic : vous pouvez fermer l'application. En y revenant, le "
+        + "traitement reprendra tout seul et se terminera en moins d'une minute.", "aide",
+        boutonFichier("Vérifier maintenant", "second", () => executer(id)),
+        boutonFichier("Abandonner", "second", () => abandonner(id)));
+      return;
+    }
     $("#etape").innerHTML = `<span class="ok">Terminé ✓</span> — coût : ${m.cout.toFixed(2)} $ — `
       + "enregistré dans « Mes documents »";
     $("#barre").style.width = "100%";
     const fichiers = m.fichiers.map((f) => ({ nom: f.nom, type: f.type, blob: new Blob([f.octets], { type: f.type }) }));
-    await archives.ajouter({ id: `${Date.now()}`, date: Date.now(), type, nom, cout: m.cout, fichiers });
-    afficherResultats(fichiers, $("#resultat"), type === "nouveau");
-    apresSucces();
+    await archives.ajouter({ id, date: Date.now(), type: travail.type, nom: travail.nom, cout: m.cout, fichiers });
+    await travaux.supprimer(id);
+    afficherResultats(fichiers, $("#resultat"), travail.type === "nouveau");
   } catch (e) {
-    $("#etape").innerHTML = "";
-    const p = document.createElement("p");
-    p.className = "erreur";
-    p.textContent = "Erreur : " + e.message;
-    $("#resultat").replaceChildren(p);
+    afficherMessage("Erreur : " + e.message, "erreur", boutonFichier("Réessayer", "", () => executer(id)));
   } finally {
+    enAttenteDe.delete(id);
     enCours = false;
+    await garderEcranAllume(false);
     document.querySelectorAll("#lancer-nouveau, #lancer-maj").forEach((b) => (b.disabled = false));
   }
 }
 
-const versMoteur = async (photos) =>
-  Promise.all(photos.map(async (p) => ({ nom: p.nom, octets: await p.blob.arrayBuffer() })));
+async function abandonner(id) {
+  if (!confirm("Abandonner ce traitement ? Les photos utilisées seront supprimées de l'appareil.")) return;
+  await travaux.supprimer(id);
+  $("#suivi").hidden = true;
+}
 
-$("#lancer-nouveau").addEventListener("click", () => {
+// À l'ouverture (et au retour dans l'application) : reprendre un travail interrompu
+// ou vérifier un lot confié à Anthropic.
+let derniereVerification = 0;
+async function reprendreTravaux() {
+  if (enCours || !stock.lire("cle")) return;
+  const liste = (await travaux.tous()).sort((a, b) => a.date - b.date);
+  const t = liste.find((x) => x.etat !== "erreur") || liste[0];
+  if (!t) return;
+  if (t.etat === "erreur") {
+    $("#suivi").hidden = false;
+    $("#titre-suivi").textContent = t.nom;
+    $("#etape").textContent = "";
+    afficherMessage("Traitement interrompu par une erreur : " + (t.message || ""), "erreur",
+      boutonFichier("Reprendre", "", () => executer(t.id)),
+      boutonFichier("Abandonner", "second", () => abandonner(t.id)));
+    return;
+  }
+  if (t.etat === "attente" && Date.now() - derniereVerification < 30000) return;
+  derniereVerification = Date.now();
+  executer(t.id);
+}
+
+async function creerTravail(type, nom, entrees, r) {
+  const travail = {
+    id: `${Date.now()}`, date: Date.now(), type, nom, mode: r.mode, etat: "en_cours",
+    entrees: { ...entrees, nom, modele: r.modele, profil: r.profil },
+  };
+  await travaux.ecrire(travail);
+  return travail.id;
+}
+
+$("#lancer-nouveau").addEventListener("click", async () => {
   const r = reglagesValides();
   if (!r) return;
+  await photosNouveau.attendre();
   const photos = photosNouveau.photos();
   if (!photos.length) return alert("Prenez ou choisissez au moins une photo.");
   const nom = $("#nom").value.trim() || "document";
-  lancer("nouveau", nom,
-    async () => ({ type: "nouveau", ...r, nom, photos: await versMoteur(photos) }),
-    () => photosNouveau.vider());
+  const id = await creerTravail("nouveau", nom, { photos }, r);
+  photosNouveau.vider(); // les photos sont maintenant gardées avec le travail
+  executer(id);
 });
 
-$("#lancer-maj").addEventListener("click", () => {
+$("#lancer-maj").addEventListener("click", async () => {
   const r = reglagesValides();
   if (!r) return;
   const fichierRef = $("#reference").files[0];
   const ref = fichierRef ? { nom: fichierRef.name, blob: fichierRef } : referenceArchivee;
   if (!ref) return alert("Choisissez le document de référence (.docx), ou un document de « Mes documents ».");
+  await Promise.all([...document.querySelectorAll(".personne")].map((b) => b.selecteur.attendre()));
   const blocs = [...document.querySelectorAll(".personne")]
     .map((b) => ({ bloc: b, nom: b.querySelector("input[type=text]").value.trim(), photos: b.selecteur.photos() }))
     .filter((p) => p.photos.length);
@@ -326,15 +422,14 @@ $("#lancer-maj").addEventListener("click", () => {
   if (blocs.some((p) => !p.nom)) return alert("Indiquez le prénom de chaque personne.");
   if (new Set(blocs.map((p) => p.nom)).size !== blocs.length) return alert("Deux personnes ont le même prénom.");
   const nom = $("#nom-maj").value.trim() || "document_maj";
-  lancer("maj", nom, async () => ({
-    type: "maj", ...r, nom,
-    reference: { nom: ref.nom, octets: await ref.blob.arrayBuffer() },
-    personnes: await Promise.all(blocs.map(async (p) => ({ nom: p.nom, photos: await versMoteur(p.photos) }))),
-  }), () => {
-    blocs.forEach((p) => p.bloc.selecteur.vider());
-    enregistrerPersonnes();
-  });
+  const reference = { nom: ref.nom, blob: new Blob([await ref.blob.arrayBuffer()], { type: DOCX }) };
+  const id = await creerTravail("maj", nom, { reference, personnes: blocs.map(({ nom, photos }) => ({ nom, photos })) }, r);
+  blocs.forEach((p) => p.bloc.selecteur.vider());
+  enregistrerPersonnes();
+  executer(id);
 });
+
+reprendreTravaux();
 
 // ---------------------------------------------------------------------------
 // Fichiers produits : téléchargement, partage, rapport lisible
@@ -349,6 +444,28 @@ function boutonFichier(texte, classe, action) {
   return b;
 }
 
+function telecharger(f) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(f.blob);
+  a.download = f.nom;
+  a.click();
+}
+
+async function partager(f) {
+  // Chrome (Android) ne partage pas les fichiers Word ; le rapport part en texte (.txt).
+  const fichier = f.nom.endsWith(".md")
+    ? new File([f.blob], f.nom.replace(/\.md$/, ".txt"), { type: "text/plain" })
+    : new File([f.blob], f.nom, { type: f.type });
+  if (navigator.canShare?.({ files: [fichier] })) {
+    try { await navigator.share({ files: [fichier], title: f.nom }); } catch { /* partage annulé */ }
+    return;
+  }
+  telecharger(f);
+  alert("Ce navigateur ne permet pas de partager directement ce type de fichier. Il vient d'être "
+    + "téléchargé : ouvrez « Téléchargements » (ou Fichiers) et partagez-le de là, ou joignez-le "
+    + "depuis WhatsApp / votre messagerie.");
+}
+
 function afficherResultats(fichiers, cible, referenceProposee = false) {
   const liste = document.createElement("div");
   liste.className = "fichiers";
@@ -359,17 +476,8 @@ function afficherResultats(fichiers, cible, referenceProposee = false) {
     nom.textContent = f.nom;
     const actions = document.createElement("div");
     actions.className = "rangee";
-    actions.append(boutonFichier("Télécharger", "", () => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(f.blob);
-      a.download = f.nom;
-      a.click();
-    }));
-    const fichier = new File([f.blob], f.nom, { type: f.type });
-    if (navigator.canShare?.({ files: [fichier] })) {
-      actions.append(boutonFichier("Partager", "second",
-        () => navigator.share({ files: [fichier], title: f.nom }).catch(() => {})));
-    }
+    actions.append(boutonFichier("Télécharger", "", () => telecharger(f)),
+                   boutonFichier("Partager", "second", () => partager(f)));
     ligne.append(nom, actions);
     liste.append(ligne);
     // un document fraîchement transcrit (sans modifications suivies) peut servir de référence

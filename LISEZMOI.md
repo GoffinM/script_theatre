@@ -16,6 +16,9 @@ C'est une page statique, publiable telle quelle sur GitHub Pages. Le code Python
 - **Onglet « Nouveau document » :** photos → DOCX, DOCX à annoter (numéroté) et rapport.
 - **Onglet « Mes documents » :** chaque résultat y est enregistré automatiquement, sur l'appareil uniquement. On peut le retélécharger, le partager, le supprimer, ou utiliser un document transcrit comme référence d'une mise à jour.
 - **Onglet « Mise à jour » :** DOCX de référence + photos annotées par personne → DOCX en suivi des modifications et rapport.
+- **Interruption :** chaque réponse de Claude est enregistrée dès réception. Un traitement interrompu (page quittée, téléphone en veille) reprend tout seul à la réouverture, sans repayer ce qui est déjà fait. L'écran reste allumé pendant le traitement.
+- **Mode « en arrière-plan »** (Réglages > Exécution) : la transcription est confiée à l'API Batch d'Anthropic. Elle est traitée même application fermée (en général en quelques minutes) et coûte 2 fois moins cher. À la réouverture, l'application termine le document. Anthropic refuse l'API Batch depuis un navigateur, d'où le petit relais gratuit à déployer sur Cloudflare (`outils/relais-cloudflare.js`, mode d'emploi en tête du fichier). Ce relais ne conserve aucune clé.
+- **Partage :** Chrome sur Android refuse de partager les fichiers Word. « Partager » télécharge alors le fichier, et on l'envoie depuis Téléchargements ou depuis WhatsApp. Le rapport, lui, se partage en texte.
 - **Profil :** « Réglages > Modifier le profil » permet par exemple d'adapter la liste des personnages. Le profil modifié est enregistré sur l'appareil.
 - **Pas de PDF** dans le navigateur : ouvrir le DOCX dans Word, Pages ou Google Docs pour l'exporter.
 

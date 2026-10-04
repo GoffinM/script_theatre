@@ -39,6 +39,8 @@ class Relais(SimpleHTTPRequestHandler):
         return any(p.startswith(".") and p not in (".", "..") for p in parties) or "eval" in parties
 
     def do_GET(self):
+        if self.path.startswith("/v1/"):  # lecture d'un lot (API Batch)
+            return self._relayer("GET")
         if self._interdit():
             return self.send_error(404)
         super().do_GET()
@@ -50,10 +52,13 @@ class Relais(SimpleHTTPRequestHandler):
     def do_POST(self):
         if not self.path.startswith("/v1/"):
             return self.send_error(404)
-        corps = self.rfile.read(int(self.headers.get("content-length", 0)))
+        self._relayer("POST")
+
+    def _relayer(self, methode: str):
+        corps = self.rfile.read(int(self.headers.get("content-length", 0))) if methode == "POST" else None
         entetes = {k: v for k, v in self.headers.items() if k.lower() in TRANSMIS}
         entetes["x-api-key"] = CLE
-        req = urllib.request.Request("https://api.anthropic.com" + self.path, corps, entetes, method="POST")
+        req = urllib.request.Request("https://api.anthropic.com" + self.path, corps, entetes, method=methode)
         try:
             with urllib.request.urlopen(req, timeout=600) as rep:
                 statut, donnees, type_ = rep.status, rep.read(), rep.headers.get("content-type")
